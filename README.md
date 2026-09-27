@@ -25,4 +25,16 @@ A single-file, self-contained web app (`index.html` — no build step, no depend
 
 ## Updating later
 
-Any time the app changes: copy the new `index.html` into this folder, commit, and push. Cloudflare Pages picks it up automatically — no dashboard steps needed after the first setup.
+Any time the app changes: copy the new files into this folder, commit, and push. Cloudflare Pages picks it up automatically — no dashboard steps needed after the first setup.
+
+## Account sync (one-time setup)
+
+The app has an optional "Create account with a PIN" feature so Eliza's points/progress can follow her across devices. It's backed by a small serverless function (`functions/api/[[path]].js`) that needs a Cloudflare KV namespace to store accounts in. One-time setup:
+
+1. **Create the KV namespace:** Cloudflare dashboard → **Workers & Pages** → **KV** (in the left sidebar) → **Create a namespace**. Name it something like `catcamp-accounts`.
+2. **Bind it to the Pages project:** go to your `cat-camp` Pages project → **Settings** → **Functions** → **KV namespace bindings** → **Add binding**.
+   - Variable name: `CATCAMP_KV` (must match exactly — the code looks for this name)
+   - KV namespace: the one you just created
+3. **Redeploy** — trigger a new deployment (any push to `main`, or use "Retry deployment" on the latest one in the dashboard) so the binding takes effect.
+
+Once that's done, the "Create account" flow on the Home screen (cloud icon, top-left) will work — no further setup needed. Accounts are stored as `name` + a securely hashed PIN (never the PIN itself) in that KV namespace.
