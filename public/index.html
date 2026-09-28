@@ -222,15 +222,15 @@
 
   var COLOR_DEFS = [
     { key: "orange", label: "Classic", head: "#F0964F", ear: "#E8863C", nose: "#C4632B", cost: 0 },
-    { key: "teal", label: "Teal Tabby", head: "#5FB5A6", ear: "#4FA895", nose: "#35786F", cost: 5 },
-    { key: "pink", label: "Sunset Pink", head: "#E88AA0", ear: "#D96C87", nose: "#B54F68", cost: 20 },
-    { key: "purple", label: "Cosmic Purple", head: "#A78BC4", ear: "#8F6FB0", nose: "#6E5590", cost: 30 },
-    { key: "blue", label: "Sky Blue", head: "#6FA8C7", ear: "#5B90B5", nose: "#3E6E90", cost: 50 }
+    { key: "teal", label: "Teal Tabby", head: "#5FB5A6", ear: "#4FA895", nose: "#35786F", cost: 15 },
+    { key: "pink", label: "Sunset Pink", head: "#E88AA0", ear: "#D96C87", nose: "#B54F68", cost: 60 },
+    { key: "purple", label: "Cosmic Purple", head: "#A78BC4", ear: "#8F6FB0", nose: "#6E5590", cost: 90 },
+    { key: "blue", label: "Sky Blue", head: "#6FA8C7", ear: "#5B90B5", nose: "#3E6E90", cost: 150 }
   ];
   var OUTFIT_DEFS = [
     { key: "bandana", label: "Bandana", icon: "🧣", cost: 0 },
-    { key: "bowtie", label: "Bow Tie", icon: "🎀", cost: 15 },
-    { key: "party", label: "Party Hat", icon: "🎉", cost: 40 }
+    { key: "bowtie", label: "Bow Tie", icon: "🎀", cost: 45 },
+    { key: "party", label: "Party Hat", icon: "🎉", cost: 120 }
   ];
   var WORD_BANK = [
     { word: "CAT", hint: "A furry pet that says meow" },
@@ -662,9 +662,9 @@
       mouth = '<path d="M58 101 Q70 97 82 101" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>';
     }
     var outfitOverlay = "";
-    if (outfitKey === "bandana") outfitOverlay = '<path d="M42 108 L98 108 L70 132 Z" fill="#E2725B"/>';
+    if (outfitKey === "bandana") outfitOverlay = '<path d="M42 120 L98 120 L70 138 Z" fill="#E2725B"/>';
     else if (outfitKey === "bowtie") outfitOverlay = '<path d="M54 116 L68 108 L68 124 Z M86 116 L72 108 L72 124 Z" fill="#5FA8A0"/><circle cx="70" cy="116" r="4" fill="#35786F"/>';
-    var partyHat = outfitKey === "party" ? '<path d="M70 2 L54 32 L86 32 Z" fill="#4FA895"/><circle cx="70" cy="2" r="5" fill="#FFE3C2"/>' : "";
+    var partyHat = outfitKey === "party" ? '<path d="M70 7 L54 32 L86 32 Z" fill="#4FA895"/><circle cx="70" cy="7" r="5" fill="#FFE3C2"/>' : "";
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 140 140" fill="none">' +
       '<path d="M30 40 L20 5 L55 35 Z" fill="' + c.ear + '"/><path d="M110 40 L120 5 L85 35 Z" fill="' + c.ear + '"/>' +
       '<path d="M35 34 L29 14 L48 32 Z" fill="#FFD8B0"/><path d="M105 34 L111 14 L92 32 Z" fill="#FFD8B0"/>' +
