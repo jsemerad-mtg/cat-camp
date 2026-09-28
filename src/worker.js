@@ -86,8 +86,14 @@ function defaultGameState(name) {
     feelings: { okay: 0, frustrated: 0, sad: 0, mad: 0, embarrassed: 0 },
     unlockedColors: ["orange"],
     unlockedOutfits: ["bandana"],
+    unlockedEyeColors: ["classic"],
+    unlockedWhiskers: ["classic"],
+    unlockedMarkings: ["none"],
     selectedColor: "orange",
     selectedOutfit: null,
+    selectedEyeColor: "classic",
+    selectedWhisker: "classic",
+    selectedMarking: "none",
     levelsCompleted: 0
   };
 }

@@ -230,7 +230,28 @@
   var OUTFIT_DEFS = [
     { key: "bandana", label: "Bandana", icon: "🧣", cost: 0 },
     { key: "bowtie", label: "Bow Tie", icon: "🎀", cost: 45 },
-    { key: "party", label: "Party Hat", icon: "🎉", cost: 120 }
+    { key: "party", label: "Party Hat", icon: "🎉", cost: 120 },
+    { key: "sunglasses", label: "Sunglasses", icon: "🕶️", cost: 65 },
+    { key: "flowerCrown", label: "Flower Crown", icon: "🌸", cost: 100 },
+    { key: "crown", label: "Crown", icon: "👑", cost: 160 }
+  ];
+  var EYE_COLOR_DEFS = [
+    { key: "classic", label: "Classic", fill: "#3B2E2A", cost: 0 },
+    { key: "emerald", label: "Emerald", fill: "#3D9B72", cost: 25 },
+    { key: "sky", label: "Sky Blue", fill: "#3E8FC7", cost: 70 },
+    { key: "amber", label: "Amber", fill: "#C4872B", cost: 110 }
+  ];
+  var WHISKER_COLOR_DEFS = [
+    { key: "classic", label: "Classic Black", color: "#3B2E2A", cost: 0 },
+    { key: "white", label: "Snow White", color: "#FFFFFF", cost: 20 },
+    { key: "silver", label: "Silver", color: "#A8A29B", cost: 55 },
+    { key: "sunset", label: "Sunset Orange", color: "#E2725B", cost: 95 }
+  ];
+  var MARKING_DEFS = [
+    { key: "none", label: "None", cost: 0 },
+    { key: "stripes", label: "Tabby Stripes", cost: 35 },
+    { key: "spots", label: "Spotted", cost: 75 },
+    { key: "heart", label: "Heart Patch", cost: 130 }
   ];
   var WORD_BANK = [
     { word: "CAT", hint: "A furry pet that says meow" },
@@ -531,8 +552,14 @@
       feelings: { okay: 0, frustrated: 0, sad: 0, mad: 0, embarrassed: 0 },
       unlockedColors: ["orange"],
       unlockedOutfits: ["bandana"],
+      unlockedEyeColors: ["classic"],
+      unlockedWhiskers: ["classic"],
+      unlockedMarkings: ["none"],
       selectedColor: "orange",
       selectedOutfit: null,
+      selectedEyeColor: "classic",
+      selectedWhisker: "classic",
+      selectedMarking: "none",
       levelsCompleted: 0
     };
     try {
@@ -640,10 +667,31 @@
   }
 
   // ================= mascot svg =================
-  function mascotSvg(mood, size, colorKey, outfitKey) {
+  function markingOverlay(key, c) {
+    if (key === "stripes") {
+      return '<line x1="56" y1="38" x2="62" y2="48" stroke="' + c.ear + '" stroke-width="3" stroke-linecap="round"/>' +
+        '<line x1="84" y1="38" x2="78" y2="48" stroke="' + c.ear + '" stroke-width="3" stroke-linecap="round"/>' +
+        '<line x1="24" y1="72" x2="34" y2="76" stroke="' + c.ear + '" stroke-width="3" stroke-linecap="round"/>' +
+        '<line x1="116" y1="72" x2="106" y2="76" stroke="' + c.ear + '" stroke-width="3" stroke-linecap="round"/>';
+    }
+    if (key === "spots") {
+      return '<circle cx="58" cy="42" r="4" fill="' + c.ear + '"/><circle cx="82" cy="44" r="3.5" fill="' + c.ear + '"/>' +
+        '<circle cx="28" cy="70" r="4" fill="' + c.ear + '"/><circle cx="112" cy="72" r="4" fill="' + c.ear + '"/>' +
+        '<circle cx="70" cy="34" r="3" fill="' + c.ear + '"/>';
+    }
+    if (key === "heart") {
+      return '<path d="M100 82 C100 78 106 78 106 82 C106 78 112 78 112 82 C112 86 106 91 106 91 C106 91 100 86 100 82 Z" fill="#D96C87"/>';
+    }
+    return "";
+  }
+  function mascotSvg(mood, size, colorKey, outfitKey, eyeColorKey, whiskerKey, markingKey) {
     size = size || 90;
     var c = COLOR_DEFS.filter(function (d) { return d.key === colorKey; })[0] || COLOR_DEFS[0];
-    var eyes = '<circle cx="52" cy="70" r="6" fill="#3B2E2A"/><circle cx="88" cy="70" r="6" fill="#3B2E2A"/>';
+    var eyeDef = EYE_COLOR_DEFS.filter(function (d) { return d.key === eyeColorKey; })[0] || EYE_COLOR_DEFS[0];
+    var whiskerDef = WHISKER_COLOR_DEFS.filter(function (d) { return d.key === whiskerKey; })[0] || WHISKER_COLOR_DEFS[0];
+    var eyeFill = eyeDef.fill;
+    var whiskerColor = whiskerDef.color;
+    var eyes = '<circle cx="52" cy="70" r="6" fill="' + eyeFill + '"/><circle cx="88" cy="70" r="6" fill="' + eyeFill + '"/>';
     var mouth = '<line x1="58" y1="98" x2="82" y2="98" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round"/>';
     if (mood === "correct") {
       mouth = '<path d="M70 95 Q60 106 50 97" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
@@ -651,28 +699,36 @@
     } else if (mood === "scared") {
       eyes = '<path d="M44 62 Q52 54 60 62" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
         '<path d="M80 62 Q88 54 96 62" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
-        '<circle cx="52" cy="73" r="7" fill="#FFFFFF" stroke="#3B2E2A" stroke-width="2"/><circle cx="52" cy="74" r="3.2" fill="#3B2E2A"/>' +
-        '<circle cx="88" cy="73" r="7" fill="#FFFFFF" stroke="#3B2E2A" stroke-width="2"/><circle cx="88" cy="74" r="3.2" fill="#3B2E2A"/>' +
+        '<circle cx="52" cy="73" r="7" fill="#FFFFFF" stroke="#3B2E2A" stroke-width="2"/><circle cx="52" cy="74" r="3.2" fill="' + eyeFill + '"/>' +
+        '<circle cx="88" cy="73" r="7" fill="#FFFFFF" stroke="#3B2E2A" stroke-width="2"/><circle cx="88" cy="74" r="3.2" fill="' + eyeFill + '"/>' +
         '<path d="M100 44 Q105 52 100 57 Q95 52 100 44 Z" fill="#6FA8C7"/>';
       mouth = '<ellipse cx="70" cy="99" rx="6" ry="7" fill="#3B2E2A"/>';
     } else if (mood === "concerned") {
       eyes = '<path d="M46 63 Q52 57 58 63" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
         '<path d="M82 63 Q88 57 94 63" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>' +
-        '<circle cx="52" cy="72" r="5" fill="#3B2E2A"/><circle cx="88" cy="72" r="5" fill="#3B2E2A"/>';
+        '<circle cx="52" cy="72" r="5" fill="' + eyeFill + '"/><circle cx="88" cy="72" r="5" fill="' + eyeFill + '"/>';
       mouth = '<path d="M58 101 Q70 97 82 101" stroke="#3B2E2A" stroke-width="3" stroke-linecap="round" fill="none"/>';
     }
+    var markings = markingOverlay(markingKey, c);
     var outfitOverlay = "";
     if (outfitKey === "bandana") outfitOverlay = '<path d="M42 120 L98 120 L70 138 Z" fill="#E2725B"/>';
     else if (outfitKey === "bowtie") outfitOverlay = '<path d="M54 116 L68 108 L68 124 Z M86 116 L72 108 L72 124 Z" fill="#5FA8A0"/><circle cx="70" cy="116" r="4" fill="#35786F"/>';
+    else if (outfitKey === "sunglasses") outfitOverlay = '<rect x="38" y="63" width="28" height="16" rx="7" fill="#2B2320"/><rect x="74" y="63" width="28" height="16" rx="7" fill="#2B2320"/><line x1="66" y1="69" x2="74" y2="69" stroke="#2B2320" stroke-width="3"/>';
     var partyHat = outfitKey === "party" ? '<path d="M70 7 L54 32 L86 32 Z" fill="#4FA895"/><circle cx="70" cy="7" r="5" fill="#FFE3C2"/>' : "";
+    var flowerCrown = outfitKey === "flowerCrown" ?
+      '<circle cx="40" cy="24" r="7" fill="#E88AA0"/><circle cx="56" cy="15" r="7" fill="#FFD8B0"/><circle cx="74" cy="12" r="7" fill="#E88AA0"/><circle cx="92" cy="15" r="7" fill="#FFD8B0"/><circle cx="106" cy="24" r="7" fill="#E88AA0"/>' +
+      '<circle cx="40" cy="24" r="2.5" fill="#C4632B"/><circle cx="56" cy="15" r="2.5" fill="#C4632B"/><circle cx="74" cy="12" r="2.5" fill="#C4632B"/><circle cx="92" cy="15" r="2.5" fill="#C4632B"/><circle cx="106" cy="24" r="2.5" fill="#C4632B"/>' : "";
+    var crown = outfitKey === "crown" ?
+      '<path d="M46 24 L52 4 L64 18 L70 2 L76 18 L88 4 L94 24 Z" fill="#F4C84B"/><rect x="46" y="22" width="48" height="7" rx="2" fill="#F4C84B"/>' +
+      '<circle cx="52" cy="10" r="2.5" fill="#D96C87"/><circle cx="70" cy="7" r="2.5" fill="#5FA8A0"/><circle cx="88" cy="10" r="2.5" fill="#D96C87"/>' : "";
     return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 140 140" fill="none">' +
       '<path d="M30 40 L20 5 L55 35 Z" fill="' + c.ear + '"/><path d="M110 40 L120 5 L85 35 Z" fill="' + c.ear + '"/>' +
       '<path d="M35 34 L29 14 L48 32 Z" fill="#FFD8B0"/><path d="M105 34 L111 14 L92 32 Z" fill="#FFD8B0"/>' +
-      partyHat +
-      '<circle cx="70" cy="75" r="52" fill="' + c.head + '"/><ellipse cx="70" cy="92" rx="34" ry="24" fill="#FFEFDD"/>' +
+      partyHat + flowerCrown + crown +
+      '<circle cx="70" cy="75" r="52" fill="' + c.head + '"/>' + markings + '<ellipse cx="70" cy="92" rx="34" ry="24" fill="#FFEFDD"/>' +
       eyes + '<path d="M65 88 L75 88 L70 95 Z" fill="' + c.nose + '"/>' + mouth +
-      '<line x1="8" y1="80" x2="35" y2="76" stroke="' + c.nose + '" stroke-width="2"/><line x1="8" y1="92" x2="35" y2="90" stroke="' + c.nose + '" stroke-width="2"/>' +
-      '<line x1="132" y1="80" x2="105" y2="76" stroke="' + c.nose + '" stroke-width="2"/><line x1="132" y1="92" x2="105" y2="90" stroke="' + c.nose + '" stroke-width="2"/>' +
+      '<line x1="8" y1="80" x2="35" y2="76" stroke="' + whiskerColor + '" stroke-width="2"/><line x1="8" y1="92" x2="35" y2="90" stroke="' + whiskerColor + '" stroke-width="2"/>' +
+      '<line x1="132" y1="80" x2="105" y2="76" stroke="' + whiskerColor + '" stroke-width="2"/><line x1="132" y1="92" x2="105" y2="90" stroke="' + whiskerColor + '" stroke-width="2"/>' +
       outfitOverlay + '</svg>';
   }
   function miniFaceSvg(defKey) {
@@ -1134,6 +1190,30 @@
       saveState();
       render();
     },
+    pickEyeColor: function (key) {
+      var d = EYE_COLOR_DEFS.filter(function (d) { return d.key === key; })[0];
+      if (state.points < d.cost) return;
+      state.selectedEyeColor = key;
+      if (state.unlockedEyeColors.indexOf(key) === -1) state.unlockedEyeColors.push(key);
+      saveState();
+      render();
+    },
+    pickWhisker: function (key) {
+      var d = WHISKER_COLOR_DEFS.filter(function (d) { return d.key === key; })[0];
+      if (state.points < d.cost) return;
+      state.selectedWhisker = key;
+      if (state.unlockedWhiskers.indexOf(key) === -1) state.unlockedWhiskers.push(key);
+      saveState();
+      render();
+    },
+    pickMarking: function (key) {
+      var d = MARKING_DEFS.filter(function (d) { return d.key === key; })[0];
+      if (state.points < d.cost) return;
+      state.selectedMarking = key;
+      if (state.unlockedMarkings.indexOf(key) === -1) state.unlockedMarkings.push(key);
+      saveState();
+      render();
+    },
     celebrationContinue: function () { go("home"); }
   };
 
@@ -1402,7 +1482,7 @@
     var body = "";
     if (ob.step === "askChildName") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Hi there! What is your name?</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         '<input type="text" class="text-input" placeholder="Type your name" maxlength="20" autocomplete="off" data-bind="onboardChildNameInput" data-enter-action="onboardSubmitChildName" data-autofocus value="' + (session.onboardChildNameInput || "") + '">' +
@@ -1410,7 +1490,7 @@
         "</div>";
     } else if (ob.step === "askWantCatName") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Nice to meet you,' + escapeHtml(ob.childName) + "! Would you like to give me a name?</div></div>" +
         '<div class="row gap10" style="margin-top:8px;">' +
         '<button class="choice-btn primary fredoka" data-action="onboardWantCatName" data-arg="yes">Yes!</button>' +
@@ -1418,7 +1498,7 @@
         "</div>";
     } else if (ob.step === "enterCatName") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">What would you like to call me?</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         '<input type="text" class="text-input" placeholder="Type a name" maxlength="20" autocomplete="off" data-bind="onboardCatNameInput" data-enter-action="onboardSubmitCatName" data-autofocus value="' + (session.onboardCatNameInput || "") + '">' +
@@ -1426,7 +1506,7 @@
         "</div>";
     } else if (ob.step === "confirm") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("correct", 110, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("correct", 110, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Oh! ' + escapeHtml(ob.catName) + " - I like it! Meow!</div></div>" +
         '<div style="margin-top:8px;"><button class="primary-btn fredoka" data-action="onboardFinish">Let\'s play!</button></div>';
     }
@@ -1450,7 +1530,7 @@
       '<div style="height:52px;"></div>';
     return '<div class="screen">' +
       '<div class="col center gap8" style="margin-top:8px;">' +
-      '<div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap" style="width:110px;height:110px;">' + mascotSvg("neutral", 110, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:22px;font-weight:700;">How are you feeling today, ' + state.childName + "?</div>" +
       '<div style="font-size:14px;color:var(--ink-soft);">Tap the cat that matches you</div>' +
       "</div>" +
@@ -1477,7 +1557,7 @@
       "</div>" +
       "</div>" +
       '<div class="col center gap10" style="margin-top:8px;">' +
-      '<div class="mascot-wrap hero-avatar" style="width:140px;height:140px;">' + mascotSvg("neutral", 140, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap hero-avatar" style="width:140px;height:140px;">' + mascotSvg("neutral", 140, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:26px;font-weight:700;">Ready to play, ' + state.childName + "?</div>" +
       '<div style="font-size:15px;color:var(--ink-soft);max-width:260px;line-height:1.4;">Pick a game below. Aim for 5-10 minutes today!</div>' +
       "</div>" +
@@ -1558,7 +1638,7 @@
     var bubbleHtml = bubbleTxt ?
       '<div class="speech-bubble tail-left" style="flex:1;"><span style="font-size:15px;font-weight:700;">' + bubbleTxt + "</span></div>" : "";
     var mascotRow = '<div class="row gap10" style="align-items:flex-start;">' +
-      '<div class="mascot-wrap" style="width:86px;height:86px;flex-shrink:0;">' + mascotSvg(mood, 86, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap" style="width:86px;height:86px;flex-shrink:0;">' + mascotSvg(mood, 86, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       bubbleHtml +
       "</div>";
 
@@ -1673,7 +1753,7 @@
       '<div class="row between"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">' + headerLabel + '</div><div style="width:20px;"></div></div>' +
       tip +
       '<div class="row center" style="gap:8px;">' + paws + "</div>" +
-      '<div class="row center">' + mascotSvg("neutral", 70, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="row center">' + mascotSvg("neutral", 70, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="row center" style="gap:10px;flex-wrap:wrap;">' + boxes + "</div>" +
       hint +
       '<div class="grow"></div>' +
@@ -1685,7 +1765,7 @@
   function renderCopyCatMenu() {
     return '<div class="screen">' +
       '<div class="row gap8"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Copy-Cat</div><div style="width:20px;"></div></div>' +
-      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">Choose how to play</div></div>' +
       '<div class="col gap14" style="margin-top:6px;">' +
       '<a href="#" class="card-btn" style="background:var(--teal);box-shadow:0 6px 0 var(--teal-dark);" data-action="startCopyCatMode" data-arg="gauntlet">' +
@@ -1709,7 +1789,7 @@
     }).join("");
     return '<div class="screen">' +
       '<div class="row gap8"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Mew-lingo</div><div style="width:20px;"></div></div>' +
-      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">Pick a language</div></div>' +
       '<div class="col gap14" style="margin-top:6px;">' + cards + "</div>" +
       '<div class="grow"></div>' +
@@ -1768,7 +1848,7 @@
   function renderNotesMenu() {
     return '<div class="screen">' +
       '<div class="row gap8"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Note Names</div><div style="width:20px;"></div></div>' +
-      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">Learn the treble clef</div></div>' +
       '<div class="col gap14" style="margin-top:6px;">' +
       '<a href="#" class="card-btn" style="background:var(--sad-blue-dark);box-shadow:0 6px 0 #2E5674;" data-action="startNotesLevel" data-arg="lines">' +
@@ -1838,7 +1918,7 @@
     return '<div class="screen">' +
       '<div class="grow"></div>' +
       '<div class="col center gap8">' +
-      '<div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg(mood, 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg(mood, 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:22px;font-weight:700;text-align:center;">' + headline + "</div>" +
       '<div class="row center" style="gap:6px;flex-wrap:wrap;">' + wordDisplay + "</div>" +
       '<div style="font-size:15px;color:var(--ink-soft);text-align:center;">' + sub + "</div>" +
@@ -1866,7 +1946,7 @@
         "</div>";
     }
     return '<div class="screen">' +
-      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("concerned", 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("concerned", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:22px;font-weight:700;text-align:center;">That one was tricky!</div>' +
       '<div style="font-size:15px;color:var(--ink-soft);text-align:center;">How did that make you feel?</div>' +
       "</div>" +
@@ -1894,7 +1974,7 @@
     return '<div class="screen">' +
       '<a href="#" class="row gap6" data-action="goHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
       '<div class="col center gap6">' +
-      '<div class="mascot-wrap" style="width:86px;height:86px;">' + mascotSvg("neutral", 86, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap" style="width:86px;height:86px;">' + mascotSvg("neutral", 86, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:24px;font-weight:700;">' + state.childName + "'s Cat Report Card</div>" +
       "</div>" +
       '<div style="background:var(--orange);border-radius:20px;padding:20px;" class="row gap14">' + pawSvg(1).replace('width="22" height="22"', 'width="34" height="34"') +
@@ -1930,7 +2010,35 @@
         '<span style="font-size:10px;font-weight:700;">' + o.label + "</span>" +
         '<span style="font-size:9px;color:var(--ink-soft);">' + label + "</span></button>";
     }).join("");
-    var catSvg = mascotSvg("correct", 150, state.selectedColor, state.selectedOutfit);
+    var eyeSwatches = EYE_COLOR_DEFS.map(function (d) {
+      var locked = state.points < d.cost;
+      var label = locked ? d.cost + " pts" : (state.selectedEyeColor === d.key ? "Wearing" : "Unlocked");
+      var ring = state.selectedEyeColor === d.key ? " ring" : "";
+      var lockIcon = locked ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" fill="#fff"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="#fff" stroke-width="2" fill="none"/></svg>' : "";
+      return '<button class="swatch" data-action="pickEyeColor" data-arg="' + d.key + '">' +
+        '<div class="swatch-circle' + ring + '" style="background:' + d.fill + ';">' + lockIcon + "</div>" +
+        '<span style="font-size:9px;color:var(--ink-soft);">' + label + "</span></button>";
+    }).join("");
+    var whiskerSwatches = WHISKER_COLOR_DEFS.map(function (d) {
+      var locked = state.points < d.cost;
+      var label = locked ? d.cost + " pts" : (state.selectedWhisker === d.key ? "Wearing" : "Unlocked");
+      var ring = state.selectedWhisker === d.key ? " ring" : "";
+      var lockIcon = locked ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" fill="#fff"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="#fff" stroke-width="2" fill="none"/></svg>' : "";
+      return '<button class="swatch" data-action="pickWhisker" data-arg="' + d.key + '">' +
+        '<div class="swatch-circle' + ring + '" style="background:' + d.color + ';border:1px solid #e2d8ce;">' + lockIcon + "</div>" +
+        '<span style="font-size:9px;color:var(--ink-soft);">' + label + "</span></button>";
+    }).join("");
+    var markingIcons = { none: "⭕", stripes: "🐯", spots: "🐆", heart: "💗" };
+    var markings = MARKING_DEFS.map(function (m) {
+      var locked = state.points < m.cost;
+      var label = locked ? m.cost + " pts" : (state.selectedMarking === m.key ? "Wearing" : "Unlocked");
+      var ring = state.selectedMarking === m.key ? " ring" : "";
+      return '<button class="outfit-btn' + ring + '" data-action="pickMarking" data-arg="' + m.key + '">' +
+        '<span class="fredoka" style="font-size:20px;">' + markingIcons[m.key] + "</span>" +
+        '<span style="font-size:10px;font-weight:700;">' + m.label + "</span>" +
+        '<span style="font-size:9px;color:var(--ink-soft);">' + label + "</span></button>";
+    }).join("");
+    var catSvg = mascotSvg("correct", 150, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking);
     return '<div class="screen">' +
       '<div class="row between">' +
       '<a href="#" class="row gap6" data-action="goHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
@@ -1939,8 +2047,11 @@
       '<div class="fredoka" style="font-size:22px;font-weight:700;text-align:center;">Customize Your Cat</div>' +
       '<div class="col center gap8">' + catSvg +
       '<div class="row gap8"><span class="fredoka" style="font-size:18px;font-weight:600;">' + (state.catName || "My Cat") + "</span></div></div>" +
-      '<div class="col gap8" style="margin-top:4px;"><div class="fredoka" style="font-size:15px;font-weight:600;">Colors</div><div class="row" style="gap:10px;">' + swatches + "</div></div>" +
-      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Outfits</div><div class="row" style="gap:10px;">' + outfits + "</div></div>" +
+      '<div class="col gap8" style="margin-top:4px;"><div class="fredoka" style="font-size:15px;font-weight:600;">Colors</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + swatches + "</div></div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Outfits</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + outfits + "</div></div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Eye Color</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + eyeSwatches + "</div></div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Whisker Color</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + whiskerSwatches + "</div></div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Markings</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + markings + "</div></div>" +
       '<div class="grow"></div>' +
       '<a href="#" class="primary-btn fredoka" data-action="goHome">Save my cat</a>' +
       "</div>";
@@ -1960,7 +2071,7 @@
       '<div style="flex-grow:0.3;"></div>' +
       '<div class="fredoka" style="font-size:26px;font-weight:700;text-align:center;">Purrfect round, ' + state.childName + "!</div>" +
       '<div style="font-size:15px;color:var(--orange-deep);text-align:center;">' + cel.subtitle + "</div>" +
-      '<div class="mascot-wrap hero-avatar" style="width:130px;height:130px;margin-top:4px;align-self:center;">' + mascotSvg("correct", 130, state.selectedColor, state.selectedOutfit) + "</div>" +
+      '<div class="mascot-wrap hero-avatar" style="width:130px;height:130px;margin-top:4px;align-self:center;">' + mascotSvg("correct", 130, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="row center" style="gap:18px;align-items:flex-end;height:30px;">' +
       '<svg class="paw-left" width="30" height="26" viewBox="0 0 30 26" fill="none"><ellipse cx="15" cy="14" rx="10" ry="8" fill="#F0964F"/><circle cx="8" cy="6" r="3.4" fill="#F0964F"/><circle cx="15" cy="4" r="3.4" fill="#F0964F"/><circle cx="22" cy="6" r="3.4" fill="#F0964F"/></svg>' +
       '<svg class="paw-right" width="30" height="26" viewBox="0 0 30 26" fill="none"><ellipse cx="15" cy="14" rx="10" ry="8" fill="#F0964F"/><circle cx="8" cy="6" r="3.4" fill="#F0964F"/><circle cx="15" cy="4" r="3.4" fill="#F0964F"/><circle cx="22" cy="6" r="3.4" fill="#F0964F"/></svg>' +
@@ -1980,14 +2091,14 @@
     if (step === "linked") {
       var statusLabel = syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Couldn't reach the server - will retry" : "Synced";
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("correct", 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("correct", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Signed in as <b>' + escapeHtml(account.name) + '</b>! Your progress follows you to any device.</div></div>' +
         '<div class="tip-bubble big" style="margin-top:8px;"><span class="txt">' + statusLabel + "</span></div>" +
         '<div class="grow"></div>' +
         '<button class="primary-btn fredoka" data-action="accountLogout" style="background:var(--wrong);box-shadow:0 5px 0 #B5432E;">Log out of this device</button>';
     } else if (step === "create") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Pick a name and a 4-digit PIN to sync your progress across devices.</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         err +
@@ -1999,7 +2110,7 @@
         "</div>";
     } else if (step === "login") {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Log in with your name and PIN to bring your progress to this device.</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         err +
@@ -2010,7 +2121,7 @@
         "</div>";
     } else {
       body =
-        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit) + "</div>" +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
         '<div class="speech-bubble">Create an account to keep your points and progress synced across every device.</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         '<button class="primary-btn fredoka" data-action="accountShowCreate">Create account</button>' +
