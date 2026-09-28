@@ -1,0 +1,13 @@
+{
+  "name": "cat-camp",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-09-27",
+  "assets": {
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "kv_namespaces": [
+    { "binding": "CATCAMP_KV", "id": "59293c9811454431a0e630839a780280" }
+  ]
+}

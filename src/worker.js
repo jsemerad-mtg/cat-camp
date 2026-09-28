@@ -1,13 +1,32 @@
-// Cloudflare Pages Function backing Cat Camp's optional account sync.
-// Routes (all POST, JSON body): /api/account (create), /api/login, /api/save
+// Cat Camp — Cloudflare Worker entry point.
 //
-// Requires a KV namespace bound to this Pages project as CATCAMP_KV.
-// See README.md for the one-time dashboard setup.
+// This project is deployed as a plain Cloudflare Worker (not Cloudflare Pages),
+// so there is no automatic "functions/" folder routing. This single script
+// handles the /api/* account-sync endpoints itself, then falls back to
+// env.ASSETS.fetch() to serve the static site (public/index.html) for
+// everything else.
+//
+// Requires a KV namespace bound as CATCAMP_KV (see README.md).
 
-export async function onRequestPost(context) {
-  const { request, env, params } = context;
-  const path = (params.path || []).join("/");
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/")) {
+      return handleApi(request, env, url);
+    }
+
+    return env.ASSETS.fetch(request);
+  }
+};
+
+async function handleApi(request, env, url) {
+  const path = url.pathname.replace(/^\/api\//, "");
   const KV = env.CATCAMP_KV;
+
+  if (request.method !== "POST") {
+    return json({ ok: false, error: "This endpoint only accepts POST." }, 405);
+  }
 
   if (!KV) {
     return json({ ok: false, error: "Server not configured yet (missing CATCAMP_KV binding)." }, 500);
@@ -24,10 +43,6 @@ export async function onRequestPost(context) {
   if (path === "login") return handleLogin(KV, body);
   if (path === "save") return handleSave(KV, body);
   return json({ ok: false, error: "Unknown endpoint." }, 404);
-}
-
-export async function onRequestGet() {
-  return json({ ok: false, error: "This endpoint only accepts POST." }, 405);
 }
 
 function json(obj, status) {

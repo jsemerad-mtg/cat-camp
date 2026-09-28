@@ -1,40 +1,61 @@
 # Cat Camp
 
-A single-file, self-contained web app (`index.html` — no build step, no dependencies).
+A self-contained web app (`public/index.html` — no build step, no dependencies) deployed as a Cloudflare **Worker** with static assets.
 
-## Deploy to Cloudflare Pages (GitHub-connected)
+## Why a Worker (not Pages)
 
-1. **Create a new GitHub repo** (e.g. `cat-camp`) at github.com/new — public or private, either works.
-2. **Push this folder to it**, from a terminal in this folder:
-   ```
-   git init
-   git add index.html README.md
-   git commit -m "Initial Cat Camp deploy"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/cat-camp.git
-   git push -u origin main
-   ```
-3. **Connect it in Cloudflare:**
-   - Cloudflare dashboard → **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
-   - Select the `cat-camp` repo
-   - Framework preset: **None**
-   - Build command: *(leave blank)*
-   - Build output directory: `/`
-   - Click **Save and Deploy**
-4. Cloudflare gives you a `cat-camp-xxx.pages.dev` URL — that's the live site. Every future `git push` to `main` auto-redeploys it.
+This project was created through Cloudflare's "Workers & Pages" flow, but ended up
+provisioned as a plain **Worker**, not a **Pages** project (you can tell from the
+`workers.dev` domain and the version-based deploy history in the dashboard).
+Plain Workers don't support the `functions/` auto-routing convention Pages has,
+so the account-sync API needs to be wired up explicitly — that's what
+`wrangler.jsonc` and `src/worker.js` do below.
+
+## Project layout
+
+- `public/index.html` — the whole app (UI, game logic, everything client-side).
+- `src/worker.js` — the Worker's entry point. Handles `/api/account`, `/api/login`,
+  and `/api/save` (the account-sync backend), then falls back to serving
+  `public/index.html` for everything else.
+- `wrangler.jsonc` — tells Cloudflare how to build and deploy this Worker,
+  including the static assets directory and the KV namespace binding.
+
+## One-time setup: Deploy command
+
+Because this is a Worker (not Pages), Cloudflare's GitHub-connected build needs
+to be told to run `wrangler deploy` explicitly:
+
+1. Cloudflare dashboard → your `cat-camp` Worker → **Settings** → **Builds**
+   (or wherever the build/deploy configuration lives for this project).
+2. Set:
+   - **Build command**: *(leave blank)*
+   - **Deploy command**: `npx wrangler deploy`
+3. Save. The next push to `main` will use this to actually deploy the Worker
+   script + assets, instead of Cloudflare's default zero-config static-only
+   behavior (which is what was silently ignoring the API before).
 
 ## Updating later
 
-Any time the app changes: copy the new files into this folder, commit, and push. Cloudflare Pages picks it up automatically — no dashboard steps needed after the first setup.
+Any time the app changes: update `public/index.html` (and/or `src/worker.js`),
+commit, and push. Cloudflare picks it up automatically — no dashboard steps
+needed after the one-time setup above.
 
-## Account sync (one-time setup)
+## Account sync (KV)
 
-The app has an optional "Create account with a PIN" feature so Eliza's points/progress can follow her across devices. It's backed by a small serverless function (`functions/api/[[path]].js`) that needs a Cloudflare KV namespace to store accounts in. One-time setup:
+The app has an optional "Create account with a PIN" feature so a child's
+points/progress can follow them across devices. It's backed by the
+`/api/*` routes in `src/worker.js`, which need a Cloudflare KV namespace.
 
-1. **Create the KV namespace:** Cloudflare dashboard → **Workers & Pages** → **KV** (in the left sidebar) → **Create a namespace**. Name it something like `catcamp-accounts`.
-2. **Bind it to the Pages project:** go to your `cat-camp` Pages project → **Settings** → **Functions** → **KV namespace bindings** → **Add binding**.
-   - Variable name: `CATCAMP_KV` (must match exactly — the code looks for this name)
-   - KV namespace: the one you just created
-3. **Redeploy** — trigger a new deployment (any push to `main`, or use "Retry deployment" on the latest one in the dashboard) so the binding takes effect.
+`wrangler.jsonc` already declares the binding:
 
-Once that's done, the "Create account" flow on the Home screen (cloud icon, top-left) will work — no further setup needed. Accounts are stored as `name` + a securely hashed PIN (never the PIN itself) in that KV namespace.
+```jsonc
+"kv_namespaces": [
+  { "binding": "CATCAMP_KV", "id": "<your namespace id>" }
+]
+```
+
+Replace `<your namespace id>` with the ID of your KV namespace (Cloudflare
+dashboard → **Workers & Pages** → **KV** → click your namespace → copy its ID).
+Once that's in place and deployed, the "Create account" flow on the Home
+screen will work — no further setup needed. Accounts are stored as `name` +
+a securely hashed PIN (never the PIN itself) in that KV namespace.
