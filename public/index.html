@@ -284,12 +284,17 @@
   // Each one can be done once per week (resets Sunday at midnight).
   var CHORE_DEFS = [
     { key: "livingRoom", label: "Clean the Living Room", icon: "🛋️", minutes: 4, points: 30 },
-    { key: "bedroom", label: "Clean Your Bedroom", icon: "🛏️", minutes: 5, points: 25 }
+    { key: "bedroom", label: "Clean Your Bedroom", icon: "🛏️", minutes: 5, points: 25 },
+    // Minutes/points here are a suggested default (not specified) - easy to tweak.
+    { key: "washHair", label: "Wash Your Hair (shampoo + conditioner)", icon: "🧴", minutes: 3, points: 20 }
   ];
   // Daily achievements: no timer, just a grown-up confirms. Each one resets every day.
   var ACHIEVEMENT_DEFS = [
     { key: "cleanPlate", label: "Clean Plate Club!", icon: "🍽️", points: 10 },
-    { key: "readyBy8", label: "Ready by 8!", icon: "🌙", points: 10 }
+    { key: "readyBy8", label: "Ready by 8!", icon: "🌙", points: 10 },
+    { key: "noViolence", label: "No Violence", icon: "🕊️", points: 10 },
+    // Point value here is a suggested default (not specified) - matches the others, easy to tweak.
+    { key: "pickUp20Toys", label: "Pick Up 20 Toys", icon: "🧸", points: 10 }
   ];
 
   var WORD_BANK = [
@@ -614,10 +619,13 @@
       selectedWhisker: "classic",
       selectedMarking: "none",
       levelsCompleted: 0,
-      parentPin: null,
+      parentPin: null, // legacy - migrated onto account.parentPin on load, see migrateParentPin()
       choreCompletions: {},
       achievementCompletions: {},
-      activeChoreTimer: null
+      activeChoreTimer: null,
+      achievementStreakCurrent: 0,
+      achievementStreakBest: 0,
+      lastAchievementDate: null
     };
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -650,9 +658,26 @@
   function clearAccount() {
     try { localStorage.removeItem(ACCOUNT_KEY); } catch (e) {}
   }
-  var account = loadAccount(); // { name, pin } or null
+  var account = loadAccount(); // { name, pin, parentPin } or null
   var syncTimer = null;
   var syncStatus = account ? "synced" : null; // null | "syncing" | "synced" | "error"
+
+  // The grown-up verification code used to live on the per-device game `state`. It now
+  // lives on the account instead, so it travels with the account across devices (and so a
+  // future parent dashboard can read it from one place). This moves any old value over.
+  function migrateParentPin() {
+    // Only migrate (and clear) once there's an account to move it onto. If there's no
+    // account yet, leave it on `state` for now - accountSubmitCreate/accountSubmitLogin
+    // pick it up and clear it themselves once an account exists to hold it.
+    if (state.parentPin && account && !account.parentPin) {
+      account.parentPin = state.parentPin;
+      saveAccount(account);
+      scheduleSync();
+      delete state.parentPin;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+    }
+  }
+  migrateParentPin();
 
   function scheduleSync() {
     if (!account) return;
@@ -666,7 +691,7 @@
     fetch("/api/save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: account.name, pin: account.pin, state: state })
+      body: JSON.stringify({ name: account.name, pin: account.pin, state: state, parentPin: account.parentPin || null })
     }).then(function (r) { return r.json(); }).then(function (res) {
       syncStatus = res && res.ok ? "synced" : "error";
       if (session.view === "account") render();
@@ -685,6 +710,10 @@
       if (res && res.ok) {
         state = Object.assign({}, state, res.state);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        if (typeof res.parentPin === "string" && res.parentPin && account.parentPin !== res.parentPin) {
+          account.parentPin = res.parentPin;
+          saveAccount(account);
+        }
         syncStatus = "synced";
       } else {
         syncStatus = "error";
@@ -721,6 +750,23 @@
     state.streakBest = Math.max(state.streakBest, state.streakCurrent);
     state.lastPlayedDate = today;
     saveState();
+  }
+
+  // Tracks consecutive days with at least one verified daily achievement (Clean Plate
+  // Club, Ready by 8, etc). Weekly chores don't count toward this - it's about the
+  // every-day habits. Same one-bump-per-day, break-on-a-skipped-day logic as the play streak.
+  function recordDailyAchievement() {
+    var today = todayStr();
+    if (state.lastAchievementDate === today) return;
+    if (state.lastAchievementDate) {
+      var prev = new Date(state.lastAchievementDate.replace(/-/g, "/"));
+      var diffDays = Math.round((new Date(today.replace(/-/g, "/")) - prev) / 86400000);
+      state.achievementStreakCurrent = diffDays === 1 ? state.achievementStreakCurrent + 1 : 1;
+    } else {
+      state.achievementStreakCurrent = 1;
+    }
+    state.achievementStreakBest = Math.max(state.achievementStreakBest, state.achievementStreakCurrent);
+    state.lastAchievementDate = today;
   }
 
   // ================= mascot svg =================
@@ -862,6 +908,31 @@
     }, 1000);
   }
 
+  // Called after an account is successfully created or logged into. Sends the person
+  // wherever they were headed before Chores redirected them to set up an account.
+  function finishAccountLink() {
+    if (session.accountReturnTo === "chores") {
+      session.accountReturnTo = null;
+      enterChores();
+    } else {
+      session.accountReturnTo = null;
+      session.accountStep = "linked";
+    }
+  }
+
+  // Shared setup for entering the Chores screen, used both from the home-screen button
+  // and after linking/creating an account (see accountReturnTo).
+  function enterChores() {
+    if (!account.parentPin) session.choresStep = "setup";
+    else if (state.activeChoreTimer) session.choresStep = "timer";
+    else session.choresStep = "menu";
+    session.choresPinSetupA = "";
+    session.choresPinSetupB = "";
+    session.choresSetupError = null;
+    go("chores");
+    startChoreTicker();
+  }
+
   // ================= router =================
   function go(view, extra) {
     session.view = view;
@@ -980,7 +1051,7 @@
       session.view = null;
       render();
     },
-    goHome: function () { go("home"); },
+    goHome: function () { session.accountReturnTo = null; go("home"); },
     goMood: function () { go("mood"); },
     goMath: function () { startMath(); },
     goCopyCatMenu: function () { go("copycatMenu"); },
@@ -1010,18 +1081,21 @@
     goReport: function () { go("report"); },
     goCustomizer: function () { go("customizer"); },
     goChores: function () {
-      if (!state.parentPin) session.choresStep = "setup";
-      else if (state.activeChoreTimer) session.choresStep = "timer";
-      else session.choresStep = "menu";
-      session.choresPinSetupA = "";
-      session.choresPinSetupB = "";
-      session.choresSetupError = null;
-      go("chores");
-      startChoreTicker();
+      if (!account) {
+        // Mega Unlocks need an account so the grown-up code (and, later, chore approvals)
+        // travel across devices instead of being stuck on one phone or tablet.
+        session.accountReturnTo = "chores";
+        session.accountStep = "menu";
+        session.accountError = null;
+        go("account");
+        return;
+      }
+      enterChores();
     },
     goAccount: function () {
       session.accountStep = account ? "linked" : "menu";
       session.accountError = null;
+      session.accountReturnTo = null;
       go("account");
     },
     accountShowCreate: function () {
@@ -1053,16 +1127,17 @@
       fetch("/api/account", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name, pin: pin, state: state })
+        body: JSON.stringify({ name: name, pin: pin, state: state, parentPin: state.parentPin || null })
       }).then(function (r) { return r.json(); }).then(function (res) {
         session.accountBusy = false;
         if (res && res.ok) {
-          account = { name: name, pin: pin };
+          account = { name: name, pin: pin, parentPin: res.parentPin || null };
           saveAccount(account);
           state = Object.assign({}, state, res.state);
+          delete state.parentPin;
           saveState();
           syncStatus = "synced";
-          session.accountStep = "linked";
+          finishAccountLink();
         } else {
           session.accountError = (res && res.error) || "Something went wrong.";
         }
@@ -1087,12 +1162,17 @@
       }).then(function (r) { return r.json(); }).then(function (res) {
         session.accountBusy = false;
         if (res && res.ok) {
-          account = { name: name, pin: pin };
+          // If this device already had a grown-up code set locally (from before accounts
+          // supported one), and the server doesn't have one yet, bring it along.
+          var pp = res.parentPin || state.parentPin || null;
+          account = { name: name, pin: pin, parentPin: pp };
           saveAccount(account);
           state = Object.assign({}, state, res.state);
+          delete state.parentPin;
           saveState();
           syncStatus = "synced";
-          session.accountStep = "linked";
+          if (!res.parentPin && pp) scheduleSync();
+          finishAccountLink();
         } else {
           session.accountError = (res && res.error) || "Couldn't log in.";
         }
@@ -1306,8 +1386,9 @@
       var b = (session.choresPinSetupB || "").trim();
       if (!/^[0-9]{4}$/.test(a)) { session.choresSetupError = "Grown-up code needs to be 4 digits."; render(); return; }
       if (a !== b) { session.choresSetupError = "Codes don't match - try again."; render(); return; }
-      state.parentPin = a;
-      saveState();
+      account.parentPin = a;
+      saveAccount(account);
+      scheduleSync();
       session.choresSetupError = null;
       session.choresStep = "menu";
       render();
@@ -1361,7 +1442,7 @@
       cur += n;
       session.choresPinInput = cur;
       if (cur.length === 4) {
-        if (cur === state.parentPin) {
+        if (cur === account.parentPin) {
           var v = session.choresVerify;
           var def, amount;
           if (v.type === "chore") {
@@ -1373,6 +1454,7 @@
             def = ACHIEVEMENT_DEFS.filter(function (d) { return d.key === v.key; })[0];
             amount = def.points;
             state.achievementCompletions[v.key] = todayStr();
+            recordDailyAchievement();
           }
           state.points += amount;
           saveState();
@@ -2169,6 +2251,11 @@
       '<div class="stat-card" style="background:#DFF3EF;padding:12px 6px;">' + starIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + state.streakBest + ' days</span><span style="font-size:11px;color:var(--ink-soft);">Best streak</span></div>' +
       '<div class="stat-card" style="background:var(--peach);padding:12px 6px;">' + trophyIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + (state.levelsCompleted || 0) + '</span><span style="font-size:11px;color:var(--ink-soft);">Levels completed</span></div>' +
       "</div>" +
+      (state.achievementStreakBest > 0 ?
+        '<div style="display:grid;grid-template-columns:repeat(2, minmax(0,1fr));gap:10px;">' +
+        '<div class="stat-card" style="background:#FBEED2;padding:12px 6px;">' + flameIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + state.achievementStreakCurrent + ' days</span><span style="font-size:11px;color:var(--ink-soft);">Daily goal streak</span></div>' +
+        '<div class="stat-card" style="background:#DFF3EF;padding:12px 6px;">' + starIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + state.achievementStreakBest + ' days</span><span style="font-size:11px;color:var(--ink-soft);">Best daily-goal streak</span></div>' +
+        "</div>" : "") +
       '<div class="col gap10" style="margin-top:4px;"><div class="fredoka" style="font-size:16px;font-weight:600;">How you\'ve been feeling</div>' + barsHtml + "</div>" +
       '<div class="grow"></div>' +
       '<div style="text-align:center;font-size:13px;color:var(--ink-soft);">5 minutes a day - you\'re building a great habit!</div>' +
@@ -2244,7 +2331,7 @@
 
   // ================= render: chores (Mega Unlocks) =================
   function renderChores() {
-    var step = session.choresStep || (state.parentPin ? "menu" : "setup");
+    var step = session.choresStep || (account && account.parentPin ? "menu" : "setup");
 
     if (step === "setup") {
       var setupErr = session.choresSetupError ? '<div style="background:var(--mad-red);color:var(--orange-deep);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:600;">' + escapeHtml(session.choresSetupError) + "</div>" : "";
@@ -2352,7 +2439,11 @@
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Weekly Chores</div>' +
       '<div style="font-size:12px;color:var(--ink-soft);margin-top:-6px;">One of each per week - resets Sunday at midnight.</div>' +
       '<div class="col gap8" style="margin-top:4px;">' + choreCards + "</div></div>" +
-      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Daily Achievements</div>' +
+      '<div class="col gap8"><div class="row between" style="align-items:baseline;">' +
+      '<div class="fredoka" style="font-size:15px;font-weight:600;">Daily Achievements</div>' +
+      (state.achievementStreakCurrent > 0 ?
+        '<div class="pill" style="font-size:12px;">' + flameIcon() + '<span>' + state.achievementStreakCurrent + " day streak</span></div>" : "") +
+      "</div>" +
       '<div class="col gap8" style="margin-top:4px;">' + achCards + "</div></div>" +
       '<div class="grow"></div>' +
       "</div>";
@@ -2421,9 +2512,12 @@
         '<a href="#" class="fredoka" style="text-align:center;font-size:14px;font-weight:700;color:var(--orange-dark);" data-action="accountBackToMenu">Back</a>' +
         "</div>";
     } else {
+      var bubbleText = session.accountReturnTo === "chores" ?
+        "Mega Unlocks needs an account first, so the grown-up code travels with you to any device." :
+        "Create an account to keep your points and progress synced across every device.";
       body =
         '<div class="col center gap6"><div class="mascot-wrap" style="width:100px;height:100px;">' + mascotSvg("neutral", 100, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
-        '<div class="speech-bubble">Create an account to keep your points and progress synced across every device.</div></div>' +
+        '<div class="speech-bubble">' + bubbleText + '</div></div>' +
         '<div class="col gap10" style="margin-top:8px;">' +
         '<button class="primary-btn fredoka" data-action="accountShowCreate">Create account</button>' +
         '<button class="choice-btn fredoka" data-action="accountShowLogin">I already have one - log in</button>' +

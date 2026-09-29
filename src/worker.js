@@ -95,7 +95,6 @@ function defaultGameState(name) {
     selectedWhisker: "classic",
     selectedMarking: "none",
     levelsCompleted: 0,
-    parentPin: null,
     choreCompletions: {},
     achievementCompletions: {},
     activeChoreTimer: null
@@ -120,10 +119,11 @@ async function handleCreate(KV, body) {
     body.state && typeof body.state === "object"
       ? Object.assign(defaultGameState(body.name), body.state)
       : defaultGameState(body.name);
+  const parentPin = typeof body.parentPin === "string" ? body.parentPin : null;
 
-  const record = { salt, pinHash, state, updatedAt: Date.now() };
+  const record = { salt, pinHash, state, parentPin, updatedAt: Date.now() };
   await KV.put(key, JSON.stringify(record));
-  return json({ ok: true, state });
+  return json({ ok: true, state, parentPin });
 }
 
 async function handleLogin(KV, body) {
@@ -139,7 +139,7 @@ async function handleLogin(KV, body) {
   const check = await hashPin(pin, record.salt);
   if (check !== record.pinHash) return json({ ok: false, error: "Incorrect PIN." }, 401);
 
-  return json({ ok: true, state: record.state });
+  return json({ ok: true, state: record.state, parentPin: record.parentPin || null });
 }
 
 async function handleSave(KV, body) {
@@ -156,6 +156,9 @@ async function handleSave(KV, body) {
   if (check !== record.pinHash) return json({ ok: false, error: "Incorrect PIN." }, 401);
 
   record.state = body.state && typeof body.state === "object" ? body.state : record.state;
+  if (typeof body.parentPin === "string" || body.parentPin === null) {
+    record.parentPin = body.parentPin;
+  }
   record.updatedAt = Date.now();
   await KV.put(key, JSON.stringify(record));
   return json({ ok: true });
