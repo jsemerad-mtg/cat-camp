@@ -177,6 +177,22 @@
   .stat-card {
     border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px; align-items: center;
   }
+  .chore-card {
+    display: flex; align-items: center; gap: 12px; background: var(--card-cream); border-radius: 16px;
+    padding: 12px 14px; width: 100%; text-align: left;
+  }
+  .chore-icon { font-size: 26px; width: 34px; text-align: center; flex-shrink: 0; }
+  .chore-name { font-family: 'Fredoka', sans-serif; font-size: 14px; font-weight: 600; }
+  .chore-meta { font-size: 11.5px; color: var(--ink-soft); }
+  .chore-state {
+    font-size: 10.5px; font-weight: 700; padding: 5px 10px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
+  }
+  .chore-state.available { background: #DFF3EF; color: var(--teal-dark); }
+  .chore-state.progress { background: var(--amber); color: var(--orange-deep); }
+  .chore-state.done { background: rgba(59,46,42,0.06); color: var(--ink-soft); }
+  .pin-dots { display: flex; gap: 16px; justify-content: center; }
+  .pin-dot { width: 16px; height: 16px; border-radius: 50%; background: var(--card-cream); border: 2px solid var(--orange); }
+  .pin-dot.filled { background: var(--orange); }
   .bar-track { flex-grow: 1; height: 12px; border-radius: 6px; background: var(--card-cream); overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 6px; }
   @keyframes knead { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
@@ -262,6 +278,20 @@
     { key: "spots", label: "Spotted", cost: 300 },
     { key: "heart", label: "Heart Patch", cost: 480 }
   ];
+
+  // ---- Mega Unlocks: real-world chores & daily achievements, parent-verified ----
+  // Weekly chores: pick one, a timer runs, then a grown-up confirms it's done.
+  // Each one can be done once per week (resets Sunday at midnight).
+  var CHORE_DEFS = [
+    { key: "livingRoom", label: "Clean the Living Room", icon: "🛋️", minutes: 4, points: 30 },
+    { key: "bedroom", label: "Clean Your Bedroom", icon: "🛏️", minutes: 5, points: 25 }
+  ];
+  // Daily achievements: no timer, just a grown-up confirms. Each one resets every day.
+  var ACHIEVEMENT_DEFS = [
+    { key: "cleanPlate", label: "Clean Plate Club!", icon: "🍽️", points: 10 },
+    { key: "readyBy8", label: "Ready by 8!", icon: "🌙", points: 10 }
+  ];
+
   var WORD_BANK = [
     { word: "CAT", hint: "A furry pet that says meow" },
     { word: "DOG", hint: "A pet that loves to bark" },
@@ -548,6 +578,20 @@
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
 
+  // Most recent Sunday at midnight, as a date string - the cooldown window for weekly chores.
+  function currentWeekStartStr() {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() - d.getDay());
+    return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+  }
+  function choreAvailable(key) {
+    return state.choreCompletions[key] !== currentWeekStartStr();
+  }
+  function achievementAvailable(key) {
+    return state.achievementCompletions[key] !== todayStr();
+  }
+
   function loadState() {
     var defaults = {
       onboarded: false,
@@ -569,7 +613,11 @@
       selectedEyeColor: "classic",
       selectedWhisker: "classic",
       selectedMarking: "none",
-      levelsCompleted: 0
+      levelsCompleted: 0,
+      parentPin: null,
+      choreCompletions: {},
+      achievementCompletions: {},
+      activeChoreTimer: null
     };
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -798,6 +846,22 @@
     return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="#3B2E2A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   }
 
+  // Re-renders once a second while a chore timer is on screen, so the countdown moves
+  // and the screen flips to "ask a grown-up" the moment it hits zero. Self-stops once
+  // the timer view is left, and is safe to call repeatedly (only one interval runs).
+  var choreTickHandle = null;
+  function startChoreTicker() {
+    if (choreTickHandle) return;
+    choreTickHandle = setInterval(function () {
+      if (session.view !== "chores" || session.choresStep !== "timer") {
+        clearInterval(choreTickHandle);
+        choreTickHandle = null;
+        return;
+      }
+      render();
+    }, 1000);
+  }
+
   // ================= router =================
   function go(view, extra) {
     session.view = view;
@@ -836,6 +900,7 @@
     else if (session.view === "checkin") html = renderCheckin();
     else if (session.view === "report") html = renderReport();
     else if (session.view === "customizer") html = renderCustomizer();
+    else if (session.view === "chores") html = renderChores();
     else if (session.view === "celebration") html = renderCelebration();
     else if (session.view === "account") html = renderAccount();
     else if (session.view === "mewlingoMenu") html = renderMewLingoMenu();
@@ -944,6 +1009,16 @@
     },
     goReport: function () { go("report"); },
     goCustomizer: function () { go("customizer"); },
+    goChores: function () {
+      if (!state.parentPin) session.choresStep = "setup";
+      else if (state.activeChoreTimer) session.choresStep = "timer";
+      else session.choresStep = "menu";
+      session.choresPinSetupA = "";
+      session.choresPinSetupB = "";
+      session.choresSetupError = null;
+      go("chores");
+      startChoreTicker();
+    },
     goAccount: function () {
       session.accountStep = account ? "linked" : "menu";
       session.accountError = null;
@@ -1223,7 +1298,104 @@
       saveState();
       render();
     },
-    celebrationContinue: function () { go("home"); }
+    celebrationContinue: function () { go(session.celebrationReturnTo || "home"); },
+
+    // ---- Mega Unlocks: chores & achievements ----
+    choresSetupSubmit: function () {
+      var a = (session.choresPinSetupA || "").trim();
+      var b = (session.choresPinSetupB || "").trim();
+      if (!/^[0-9]{4}$/.test(a)) { session.choresSetupError = "Grown-up code needs to be 4 digits."; render(); return; }
+      if (a !== b) { session.choresSetupError = "Codes don't match - try again."; render(); return; }
+      state.parentPin = a;
+      saveState();
+      session.choresSetupError = null;
+      session.choresStep = "menu";
+      render();
+    },
+    choresBackToMenu: function () {
+      session.choresStep = "menu";
+      session.choresPinInput = "";
+      session.choresPinError = null;
+      render();
+    },
+    startChore: function (key) {
+      if (state.activeChoreTimer) return;
+      if (!choreAvailable(key)) return;
+      var c = CHORE_DEFS.filter(function (d) { return d.key === key; })[0];
+      if (!c) return;
+      state.activeChoreTimer = { key: key, endsAt: Date.now() + c.minutes * 60000 };
+      saveState();
+      session.choresStep = "timer";
+      render();
+      startChoreTicker();
+    },
+    viewChoreTimer: function () {
+      session.choresStep = "timer";
+      render();
+      startChoreTicker();
+    },
+    cancelChoreTimer: function () {
+      state.activeChoreTimer = null;
+      saveState();
+      session.choresStep = "menu";
+      render();
+    },
+    requestChoreVerify: function (key) {
+      session.choresVerify = { type: "chore", key: key };
+      session.choresPinInput = "";
+      session.choresPinError = null;
+      session.choresStep = "verify";
+      render();
+    },
+    requestAchievementVerify: function (key) {
+      if (!achievementAvailable(key)) return;
+      session.choresVerify = { type: "achievement", key: key };
+      session.choresPinInput = "";
+      session.choresPinError = null;
+      session.choresStep = "verify";
+      render();
+    },
+    choresPinDigit: function (n) {
+      var cur = session.choresPinInput || "";
+      if (cur.length >= 4) return;
+      cur += n;
+      session.choresPinInput = cur;
+      if (cur.length === 4) {
+        if (cur === state.parentPin) {
+          var v = session.choresVerify;
+          var def, amount;
+          if (v.type === "chore") {
+            def = CHORE_DEFS.filter(function (d) { return d.key === v.key; })[0];
+            amount = def.points;
+            state.choreCompletions[v.key] = currentWeekStartStr();
+            state.activeChoreTimer = null;
+          } else {
+            def = ACHIEVEMENT_DEFS.filter(function (d) { return d.key === v.key; })[0];
+            amount = def.points;
+            state.achievementCompletions[v.key] = todayStr();
+          }
+          state.points += amount;
+          saveState();
+          session.choresVerify = null;
+          session.choresPinInput = "";
+          session.choresPinError = null;
+          session.choresStep = "menu";
+          session.celebrationReturnTo = "chores";
+          go("celebration", { celebration: { bonus: amount, subtitle: def.label + " - great job!" } });
+        } else {
+          session.choresPinError = true;
+          session.choresPinInput = "";
+          render();
+        }
+      } else {
+        render();
+      }
+    },
+    choresPinClear: function () {
+      session.choresPinInput = "";
+      session.choresPinError = null;
+      render();
+    }
   };
 
   // ================= math logic =================
@@ -1586,6 +1758,10 @@
       '<a href="#" class="card-btn" style="background:var(--sad-blue-dark);box-shadow:0 6px 0 #2E5674;" data-action="goNotesMenu">' +
       '<div class="card-icon"><span class="fredoka" style="font-size:20px;">🎵</span></div>' +
       '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Note Names</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Learn to read music notes</div></div>' +
+      chevronIcon() + "</a>" +
+      '<a href="#" class="card-btn" style="background:#D9A62E;box-shadow:0 6px 0 #B3841C;" data-action="goChores">' +
+      '<div class="card-icon"><span class="fredoka" style="font-size:20px;">⭐</span></div>' +
+      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Mega Unlocks</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Earn big points for real-life wins</div></div>' +
       chevronIcon() + "</a>" +
       "</div>" +
       '<div class="grow"></div>' +
@@ -2063,6 +2239,122 @@
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Markings</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + markings + "</div></div>" +
       '<div class="grow"></div>' +
       '<a href="#" class="primary-btn fredoka" data-action="goHome">Save my cat</a>' +
+      "</div>";
+  }
+
+  // ================= render: chores (Mega Unlocks) =================
+  function renderChores() {
+    var step = session.choresStep || (state.parentPin ? "menu" : "setup");
+
+    if (step === "setup") {
+      var setupErr = session.choresSetupError ? '<div style="background:var(--mad-red);color:var(--orange-deep);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:600;">' + escapeHtml(session.choresSetupError) + "</div>" : "";
+      return '<div class="screen">' +
+        '<a href="#" class="row gap6" data-action="goHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
+        '<div class="col center gap6"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
+        '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">Mega Unlocks</div>' +
+        '<div class="speech-bubble">A grown-up sets a secret 4-digit code here first - it\'s used to confirm chores and achievements are really done.</div></div>' +
+        '<div class="col gap10" style="margin-top:8px;">' +
+        setupErr +
+        '<input type="password" inputmode="numeric" class="text-input" placeholder="New 4-digit code" maxlength="4" autocomplete="off" data-bind="choresPinSetupA" value="' + escapeHtml(session.choresPinSetupA || "") + '">' +
+        '<input type="password" inputmode="numeric" class="text-input" placeholder="Confirm code" maxlength="4" autocomplete="off" data-bind="choresPinSetupB" data-enter-action="choresSetupSubmit" value="' + escapeHtml(session.choresPinSetupB || "") + '">' +
+        '<button class="primary-btn fredoka" data-action="choresSetupSubmit">Save grown-up code</button>' +
+        "</div>" +
+        '<div class="grow"></div>' +
+        "</div>";
+    }
+
+    if (step === "timer" && state.activeChoreTimer) {
+      var timerChore = CHORE_DEFS.filter(function (d) { return d.key === state.activeChoreTimer.key; })[0];
+      var remainingMs = state.activeChoreTimer.endsAt - Date.now();
+      var remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+      var mm = Math.floor(remainingSec / 60), ss = remainingSec % 60;
+      var timeStr = mm + ":" + (ss < 10 ? "0" : "") + ss;
+      var done = remainingSec <= 0;
+      return '<div class="screen">' +
+        '<a href="#" class="row gap6" data-action="choresBackToMenu">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Chores</span></a>' +
+        '<div class="grow"></div>' +
+        '<div class="col center gap10">' +
+        '<span class="fredoka" style="font-size:44px;">' + (timerChore ? timerChore.icon : "🧹") + "</span>" +
+        '<div class="fredoka" style="font-size:19px;font-weight:700;text-align:center;">' + (timerChore ? timerChore.label : "Chore") + "</div>" +
+        (done ?
+          '<div class="tip-bubble big" style="background:#DFF3EF;"><span class="txt" style="color:var(--teal-dark);">Time\'s up! Great work.</span></div>' :
+          '<div class="fredoka" style="font-size:56px;font-weight:700;color:var(--orange-dark);">' + timeStr + "</div>" +
+          '<div style="font-size:13px;color:var(--ink-soft);">Keep going until the timer ends!</div>') +
+        "</div>" +
+        '<div class="grow"></div>' +
+        (done ?
+          '<button class="primary-btn fredoka" data-action="requestChoreVerify" data-arg="' + state.activeChoreTimer.key + '">All done! Ask a grown-up</button>' :
+          '<button class="choice-btn fredoka" style="flex-grow:0;" data-action="cancelChoreTimer">Cancel</button>') +
+        "</div>";
+    }
+
+    if (step === "verify") {
+      var v = session.choresVerify || {};
+      var vdef = v.type === "chore" ?
+        CHORE_DEFS.filter(function (d) { return d.key === v.key; })[0] :
+        ACHIEVEMENT_DEFS.filter(function (d) { return d.key === v.key; })[0];
+      var pinLen = (session.choresPinInput || "").length;
+      var dots = "";
+      for (var di = 0; di < 4; di++) dots += '<div class="pin-dot' + (di < pinLen ? " filled" : "") + '"></div>';
+      var verifyErr = session.choresPinError ? '<div style="text-align:center;font-size:13px;font-weight:700;color:var(--wrong);">That code isn\'t right - try again.</div>' : "";
+      var padKeys = "";
+      for (var vn = 0; vn <= 9; vn++) {
+        padKeys += '<button class="numkey" data-action="choresPinDigit" data-arg="' + vn + '">' + vn + "</button>";
+      }
+      if (pinLen > 0) padKeys += '<button class="numkey clear" data-action="choresPinClear">Clear</button>';
+      var backAction = v.type === "chore" ? "viewChoreTimer" : "choresBackToMenu";
+      return '<div class="screen">' +
+        '<a href="#" class="row gap6" data-action="' + backAction + '">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
+        '<div class="col center gap6" style="margin-top:4px;">' +
+        '<div class="fredoka" style="font-size:19px;font-weight:700;text-align:center;">Ask a grown-up to check</div>' +
+        '<div style="font-size:14px;color:var(--ink-soft);text-align:center;">' + (vdef ? vdef.label : "") + " - enter the grown-up code" + "</div>" +
+        "</div>" +
+        '<div class="pin-dots" style="margin-top:8px;">' + dots + "</div>" +
+        verifyErr +
+        '<div class="grow"></div>' +
+        '<div class="numpad">' + padKeys + "</div>" +
+        "</div>";
+    }
+
+    // menu (default)
+    var timerActive = !!state.activeChoreTimer;
+    var choreCards = CHORE_DEFS.map(function (c) {
+      var isActiveTimer = timerActive && state.activeChoreTimer.key === c.key;
+      var available = choreAvailable(c.key);
+      var stateLabel, stateCls, clickable;
+      if (isActiveTimer) { stateLabel = "In progress"; stateCls = "progress"; clickable = "viewChoreTimer"; }
+      else if (!available) { stateLabel = "Done this week"; stateCls = "done"; clickable = null; }
+      else if (timerActive) { stateLabel = "Finish current chore first"; stateCls = "done"; clickable = null; }
+      else { stateLabel = "Start"; stateCls = "available"; clickable = "startChore"; }
+      var tag = clickable ? "button" : "div";
+      return '<' + tag + ' class="chore-card"' + (clickable ? ' data-action="' + clickable + '" data-arg="' + c.key + '"' : "") + '>' +
+        '<span class="chore-icon">' + c.icon + "</span>" +
+        '<div class="col grow" style="gap:2px;"><span class="chore-name">' + c.label + '</span><span class="chore-meta">' + c.minutes + " min &middot; +" + c.points + " pts</span></div>" +
+        '<span class="chore-state ' + stateCls + '">' + stateLabel + "</span></" + tag + ">";
+    }).join("");
+    var achCards = ACHIEVEMENT_DEFS.map(function (a) {
+      var available = achievementAvailable(a.key);
+      var stateLabel = available ? "Mark done" : "Done today";
+      var stateCls = available ? "available" : "done";
+      var tag = available ? "button" : "div";
+      return '<' + tag + ' class="chore-card"' + (available ? ' data-action="requestAchievementVerify" data-arg="' + a.key + '"' : "") + '>' +
+        '<span class="chore-icon">' + a.icon + "</span>" +
+        '<div class="col grow" style="gap:2px;"><span class="chore-name">' + a.label + '</span><span class="chore-meta">+' + a.points + " pts &middot; resets daily</span></div>" +
+        '<span class="chore-state ' + stateCls + '">' + stateLabel + "</span></" + tag + ">";
+    }).join("");
+
+    return '<div class="screen">' +
+      '<a href="#" class="row gap6" data-action="goHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
+      '<div class="col center gap6">' +
+      '<div class="fredoka" style="font-size:22px;font-weight:700;">Mega Unlocks</div>' +
+      '<div style="font-size:14px;color:var(--ink-soft);text-align:center;">Big point rewards for real-life wins. A grown-up checks each one.</div>' +
+      "</div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Weekly Chores</div>' +
+      '<div style="font-size:12px;color:var(--ink-soft);margin-top:-6px;">One of each per week - resets Sunday at midnight.</div>' +
+      '<div class="col gap8" style="margin-top:4px;">' + choreCards + "</div></div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Daily Achievements</div>' +
+      '<div class="col gap8" style="margin-top:4px;">' + achCards + "</div></div>" +
+      '<div class="grow"></div>' +
       "</div>";
   }
 

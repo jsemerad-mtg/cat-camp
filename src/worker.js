@@ -94,7 +94,11 @@ function defaultGameState(name) {
     selectedEyeColor: "classic",
     selectedWhisker: "classic",
     selectedMarking: "none",
-    levelsCompleted: 0
+    levelsCompleted: 0,
+    parentPin: null,
+    choreCompletions: {},
+    achievementCompletions: {},
+    activeChoreTimer: null
   };
 }
 
