@@ -1807,16 +1807,21 @@
 
   // ================= render: home =================
   function renderHome() {
+    var syncLabel = account ? "Synced: " + escapeHtml(account.name) : "Sync devices";
     return '<div class="screen">' +
       '<div class="row between">' +
-      '<div class="row gap10">' +
+      '<div class="col" style="gap:2px;">' +
+      '<div class="row gap6">' +
       '<div class="fredoka" style="font-size:20px;font-weight:700;">Cat Camp</div>' +
+      '<a href="#" class="icon-btn" data-action="goReport">' + chartIcon() + "</a>" +
       '<a href="#" class="icon-btn" data-action="goCustomizer">' + paletteIcon() + "</a>" +
       "</div>" +
-      '<div class="row gap8">' +
+      '<a href="#" class="row gap6" style="font-size:11px;font-weight:600;color:var(--ink-soft);" data-action="goAccount">' + cloudIcon() + "<span>" + syncLabel + "</span></a>" +
+      "</div>" +
+      '<div class="row gap6">' +
       '<a href="#" class="icon-btn" data-action="goMood">' + moodIcon() + "</a>" +
       '<div class="pill">' + pawSvg(1).replace(/22/g, "14") + "<span>" + state.points + " pts</span></div>" +
-      '<div class="pill">' + flameIcon() + "<span>" + state.streakCurrent + " day</span></div>" +
+      '<div class="pill">' + flameIcon() + "<span>" + state.streakCurrent + "</span></div>" +
       "</div>" +
       "</div>" +
       '<div class="col center gap10" style="margin-top:8px;">' +
@@ -1847,8 +1852,6 @@
       chevronIcon() + "</a>" +
       "</div>" +
       '<div class="grow"></div>' +
-      '<a href="#" class="fredoka" style="text-align:center;font-size:15px;font-weight:700;color:var(--orange-dark);" data-action="goReport">See my progress →</a>' +
-      '<a href="#" class="row center gap6" style="font-size:13px;font-weight:600;color:var(--ink-soft);margin-top:2px;" data-action="goAccount">' + cloudIcon() + "<span>" + (account ? "Synced as " + escapeHtml(account.name) : "Sync progress across devices") + "</span></a>" +
       "</div>";
   }
 
@@ -2535,6 +2538,9 @@
   }
   function cloudIcon() {
     return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M6.5 18a4 4 0 0 1-.5-7.96A5.5 5.5 0 0 1 16.9 8.1 4.5 4.5 0 0 1 17.5 18H6.5Z" stroke="#B5541D" stroke-width="1.8" fill="none" stroke-linejoin="round"/></svg>';
+  }
+  function chartIcon() {
+    return '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="13" width="4" height="7.5" rx="1" fill="#4FA895"/><rect x="10" y="7.5" width="4" height="13" rx="1" fill="#E8863C"/><rect x="16.5" y="3.5" width="4" height="17" rx="1" fill="#E2725B"/></svg>';
   }
   function trophyIcon() {
     return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M7 4h10v4a5 5 0 0 1-10 0V4Z" fill="#B5541D"/><path d="M7 6H4a3 3 0 0 0 3 3M17 6h3a3 3 0 0 1-3 3" stroke="#B5541D" stroke-width="1.6" fill="none" stroke-linecap="round"/><rect x="10" y="14" width="4" height="4" fill="#B5541D"/><rect x="8" y="18" width="8" height="2" rx="1" fill="#B5541D"/></svg>';
