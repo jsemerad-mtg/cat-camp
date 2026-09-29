@@ -220,38 +220,47 @@
 (function () {
   var STORAGE_KEY = "catcamp_state_v1";
 
+  // Costs form one ladder across every category (see the sorted list below) so a new
+  // item unlocks roughly every 30 points, instead of colors/outfits/eyes/etc each
+  // running their own fast 0-100ish scale in parallel.
+  //   30  Teal Tabby (color)       210 Sunset Pink (color)      390 Flower Crown (outfit)
+  //   60  Snow White (whisker)     240 Sunglasses (outfit)      420 Amber (eye)
+  //   90  Emerald (eye)            270 Sky Blue (eye)           450 Party Hat (outfit)
+  //  120  Tabby Stripes (marking)  300 Spotted (marking)        480 Heart Patch (marking)
+  //  150  Bow Tie (outfit)         330 Cosmic Purple (color)    510 Sky Blue (color)
+  //  180  Silver (whisker)         360 Sunset Orange (whisker)  540 Crown (outfit)
   var COLOR_DEFS = [
     { key: "orange", label: "Classic", head: "#F0964F", ear: "#E8863C", nose: "#C4632B", cost: 0 },
-    { key: "teal", label: "Teal Tabby", head: "#5FB5A6", ear: "#4FA895", nose: "#35786F", cost: 15 },
-    { key: "pink", label: "Sunset Pink", head: "#E88AA0", ear: "#D96C87", nose: "#B54F68", cost: 60 },
-    { key: "purple", label: "Cosmic Purple", head: "#A78BC4", ear: "#8F6FB0", nose: "#6E5590", cost: 90 },
-    { key: "blue", label: "Sky Blue", head: "#6FA8C7", ear: "#5B90B5", nose: "#3E6E90", cost: 150 }
+    { key: "teal", label: "Teal Tabby", head: "#5FB5A6", ear: "#4FA895", nose: "#35786F", cost: 30 },
+    { key: "pink", label: "Sunset Pink", head: "#E88AA0", ear: "#D96C87", nose: "#B54F68", cost: 210 },
+    { key: "purple", label: "Cosmic Purple", head: "#A78BC4", ear: "#8F6FB0", nose: "#6E5590", cost: 330 },
+    { key: "blue", label: "Sky Blue", head: "#6FA8C7", ear: "#5B90B5", nose: "#3E6E90", cost: 510 }
   ];
   var OUTFIT_DEFS = [
     { key: "bandana", label: "Bandana", icon: "🧣", cost: 0 },
-    { key: "bowtie", label: "Bow Tie", icon: "🎀", cost: 45 },
-    { key: "party", label: "Party Hat", icon: "🎉", cost: 120 },
-    { key: "sunglasses", label: "Sunglasses", icon: "🕶️", cost: 65 },
-    { key: "flowerCrown", label: "Flower Crown", icon: "🌸", cost: 100 },
-    { key: "crown", label: "Crown", icon: "👑", cost: 160 }
+    { key: "bowtie", label: "Bow Tie", icon: "🎀", cost: 150 },
+    { key: "party", label: "Party Hat", icon: "🎉", cost: 450 },
+    { key: "sunglasses", label: "Sunglasses", icon: "🕶️", cost: 240 },
+    { key: "flowerCrown", label: "Flower Crown", icon: "🌸", cost: 390 },
+    { key: "crown", label: "Crown", icon: "👑", cost: 540 }
   ];
   var EYE_COLOR_DEFS = [
     { key: "classic", label: "Classic", fill: "#3B2E2A", cost: 0 },
-    { key: "emerald", label: "Emerald", fill: "#3D9B72", cost: 25 },
-    { key: "sky", label: "Sky Blue", fill: "#3E8FC7", cost: 70 },
-    { key: "amber", label: "Amber", fill: "#C4872B", cost: 110 }
+    { key: "emerald", label: "Emerald", fill: "#3D9B72", cost: 90 },
+    { key: "sky", label: "Sky Blue", fill: "#3E8FC7", cost: 270 },
+    { key: "amber", label: "Amber", fill: "#C4872B", cost: 420 }
   ];
   var WHISKER_COLOR_DEFS = [
     { key: "classic", label: "Classic Black", color: "#3B2E2A", cost: 0 },
-    { key: "white", label: "Snow White", color: "#FFFFFF", cost: 20 },
-    { key: "silver", label: "Silver", color: "#A8A29B", cost: 55 },
-    { key: "sunset", label: "Sunset Orange", color: "#E2725B", cost: 95 }
+    { key: "white", label: "Snow White", color: "#FFFFFF", cost: 60 },
+    { key: "silver", label: "Silver", color: "#A8A29B", cost: 180 },
+    { key: "sunset", label: "Sunset Orange", color: "#E2725B", cost: 360 }
   ];
   var MARKING_DEFS = [
     { key: "none", label: "None", cost: 0 },
-    { key: "stripes", label: "Tabby Stripes", cost: 35 },
-    { key: "spots", label: "Spotted", cost: 75 },
-    { key: "heart", label: "Heart Patch", cost: 130 }
+    { key: "stripes", label: "Tabby Stripes", cost: 120 },
+    { key: "spots", label: "Spotted", cost: 300 },
+    { key: "heart", label: "Heart Patch", cost: 480 }
   ];
   var WORD_BANK = [
     { word: "CAT", hint: "A furry pet that says meow" },
