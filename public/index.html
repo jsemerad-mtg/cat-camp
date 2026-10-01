@@ -1079,7 +1079,19 @@
       }
     },
     goReport: function () { go("report"); },
-    goCustomizer: function () { go("customizer"); },
+    goCustomizer: function () {
+      session.editChildNameInput = state.childName || "";
+      session.editCatNameInput = state.catName || "";
+      go("customizer");
+    },
+    saveCustomizerAndHome: function () {
+      var newChildName = (session.editChildNameInput || "").trim();
+      var newCatName = (session.editCatNameInput || "").trim();
+      if (newChildName) state.childName = newChildName;
+      state.catName = newCatName ? newCatName : null;
+      saveState();
+      go("home");
+    },
     goChores: function () {
       if (!account) {
         // Mega Unlocks need an account so the grown-up code (and, later, chore approvals)
@@ -2316,19 +2328,25 @@
     var catSvg = mascotSvg("correct", 150, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking);
     return '<div class="screen">' +
       '<div class="row between">' +
-      '<a href="#" class="row gap6" data-action="goHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
+      '<a href="#" class="row gap6" data-action="saveCustomizerAndHome">' + backIcon() + '<span style="font-size:14px;font-weight:700;">Back</span></a>' +
       '<div class="pill">' + pawSvg(1).replace(/22/g, "14") + '<span>' + state.points + " points</span></div>" +
       "</div>" +
       '<div class="fredoka" style="font-size:22px;font-weight:700;text-align:center;">Customize Your Cat</div>' +
-      '<div class="col center gap8">' + catSvg +
-      '<div class="row gap8"><span class="fredoka" style="font-size:18px;font-weight:600;">' + (state.catName || "My Cat") + "</span></div></div>" +
+      '<div class="col center gap8">' + catSvg + "</div>" +
+      '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Names</div>' +
+      '<div class="col gap10">' +
+      '<div class="col" style="gap:4px;"><span style="font-size:11px;font-weight:700;color:var(--ink-soft);">Your name</span>' +
+      '<input type="text" class="text-input" placeholder="Your name" maxlength="20" autocomplete="off" data-bind="editChildNameInput" data-enter-action="saveCustomizerAndHome" value="' + escapeHtml(session.editChildNameInput != null ? session.editChildNameInput : (state.childName || "")) + '"></div>' +
+      '<div class="col" style="gap:4px;"><span style="font-size:11px;font-weight:700;color:var(--ink-soft);">Cat\'s name</span>' +
+      '<input type="text" class="text-input" placeholder="Cat\'s name" maxlength="20" autocomplete="off" data-bind="editCatNameInput" data-enter-action="saveCustomizerAndHome" value="' + escapeHtml(session.editCatNameInput != null ? session.editCatNameInput : (state.catName || "")) + '"></div>' +
+      "</div></div>" +
       '<div class="col gap8" style="margin-top:4px;"><div class="fredoka" style="font-size:15px;font-weight:600;">Colors</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + swatches + "</div></div>" +
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Outfits</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + outfits + "</div></div>" +
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Eye Color</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + eyeSwatches + "</div></div>" +
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Whisker Color</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + whiskerSwatches + "</div></div>" +
       '<div class="col gap8"><div class="fredoka" style="font-size:15px;font-weight:600;">Markings</div><div class="row" style="gap:10px;flex-wrap:wrap;">' + markings + "</div></div>" +
       '<div class="grow"></div>' +
-      '<a href="#" class="primary-btn fredoka" data-action="goHome">Save my cat</a>' +
+      '<a href="#" class="primary-btn fredoka" data-action="saveCustomizerAndHome">Save my cat</a>' +
       "</div>";
   }
 
