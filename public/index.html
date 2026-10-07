@@ -115,6 +115,21 @@
   }
   .choice-btn.primary { background: var(--orange); color: #fff; }
   .choice-btn.wrong { background: var(--wrong); color: #fff; }
+  /* Mew-lingo cheat sheet */
+  .cheat-tab {
+    flex: 1; border-radius: 999px; padding: 9px 6px; text-align: center; background: var(--card-cream);
+    font-size: 14px; font-weight: 600; color: var(--ink);
+  }
+  .cheat-tab.active { background: var(--teal); color: #fff; }
+  .cheat-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    background: var(--card-cream); border-radius: 14px; padding: 7px 12px;
+  }
+  .cheat-en { width: 96px; flex-shrink: 0; font-size: 14px; font-weight: 700; color: var(--ink-soft); }
+  .cheat-fx { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .cheat-fx .w { font-size: 17px; font-weight: 700; color: var(--ink); line-height: 1.15; }
+  .cheat-fx .k { font-size: 11px; color: var(--ink-soft); }
+  .cheat-say { font-size: 15px; flex-shrink: 0; }
   .tip-bubble {
     display: flex; align-items: center; gap: 8px; background: #DFF3EF; border-radius: 12px; padding: 10px 12px;
   }
@@ -520,6 +535,64 @@
       { word: "juu", spoken: "じゅう" }
     ]
   };
+
+  // ---- Mew-lingo: months & days of the week ----
+  // Same shape as NUMBER_WORDS: one entry per item, in the same order as the English list,
+  // so item N is the same month/day in every language. Days start on Sunday (US calendar).
+  // Japanese entries carry romaji in `word` and hiragana in `spoken` (used for speech and
+  // shown as a small second line).
+  var MONTH_NAMES_EN = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  var DAY_NAMES_EN = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var MONTH_WORDS = {
+    es: [
+      { word: "enero" }, { word: "febrero" }, { word: "marzo" }, { word: "abril" },
+      { word: "mayo" }, { word: "junio" }, { word: "julio" }, { word: "agosto" },
+      { word: "septiembre" }, { word: "octubre" }, { word: "noviembre" }, { word: "diciembre" }
+    ],
+    de: [
+      { word: "Januar" }, { word: "Februar" }, { word: "März" }, { word: "April" },
+      { word: "Mai" }, { word: "Juni" }, { word: "Juli" }, { word: "August" },
+      { word: "September" }, { word: "Oktober" }, { word: "November" }, { word: "Dezember" }
+    ],
+    ja: [
+      { word: "ichigatsu", spoken: "いちがつ" }, { word: "nigatsu", spoken: "にがつ" },
+      { word: "sangatsu", spoken: "さんがつ" }, { word: "shigatsu", spoken: "しがつ" },
+      { word: "gogatsu", spoken: "ごがつ" }, { word: "rokugatsu", spoken: "ろくがつ" },
+      { word: "shichigatsu", spoken: "しちがつ" }, { word: "hachigatsu", spoken: "はちがつ" },
+      { word: "kugatsu", spoken: "くがつ" }, { word: "juugatsu", spoken: "じゅうがつ" },
+      { word: "juuichigatsu", spoken: "じゅういちがつ" }, { word: "juunigatsu", spoken: "じゅうにがつ" }
+    ]
+  };
+  var DAY_WORDS = {
+    es: [
+      { word: "domingo" }, { word: "lunes" }, { word: "martes" }, { word: "miércoles" },
+      { word: "jueves" }, { word: "viernes" }, { word: "sábado" }
+    ],
+    de: [
+      { word: "Sonntag" }, { word: "Montag" }, { word: "Dienstag" }, { word: "Mittwoch" },
+      { word: "Donnerstag" }, { word: "Freitag" }, { word: "Samstag" }
+    ],
+    ja: [
+      { word: "nichiyoubi", spoken: "にちようび" }, { word: "getsuyoubi", spoken: "げつようび" },
+      { word: "kayoubi", spoken: "かようび" }, { word: "suiyoubi", spoken: "すいようび" },
+      { word: "mokuyoubi", spoken: "もくようび" }, { word: "kinyoubi", spoken: "きんようび" },
+      { word: "doyoubi", spoken: "どようび" }
+    ]
+  };
+  // Every Mew-lingo quiz topic. `english[i]` is the English for item i+1, `words[lang][i]`
+  // the foreign word. Numbers keep their original English-prompt quiz; months and days
+  // show the foreign word and ask for the English.
+  var MEWLINGO_TOPICS = [
+    { key: "numbers", label: "Numbers 1-10", tab: "Numbers", blurb: "Count to 10", icon: "🔢", english: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"], words: NUMBER_WORDS },
+    { key: "months", label: "Months", tab: "Months", blurb: "January to December", icon: "📅", english: MONTH_NAMES_EN, words: MONTH_WORDS },
+    { key: "days", label: "Days of the Week", tab: "Days", blurb: "Sunday to Saturday", icon: "🗓️", english: DAY_NAMES_EN, words: DAY_WORDS }
+  ];
+  function mewlingoTopic(key) {
+    return MEWLINGO_TOPICS.filter(function (t) { return t.key === key; })[0];
+  }
+  function mewlingoLangDef(key) {
+    return LANGUAGE_DEFS.filter(function (d) { return d.key === key; })[0];
+  }
   var MEWLINGO_LENGTH = 8;
   var MEWLINGO_POINTS = 1;
   var MEWLINGO_PERFECT_BONUS = 5;
@@ -975,6 +1048,8 @@
     else if (session.view === "celebration") html = renderCelebration();
     else if (session.view === "account") html = renderAccount();
     else if (session.view === "mewlingoMenu") html = renderMewLingoMenu();
+    else if (session.view === "mewlingoLang") html = renderMewLingoLang();
+    else if (session.view === "mewlingoCheat") html = renderMewLingoCheat();
     else if (session.view === "mewlingo") html = renderMewLingo();
     else if (session.view === "notesMenu") html = renderNotesMenu();
     else if (session.view === "notes") html = renderNotes();
@@ -1057,7 +1132,29 @@
     goCopyCatMenu: function () { go("copycatMenu"); },
     startCopyCatMode: function (mode) { startCopyCat(mode); },
     goMewLingoMenu: function () { go("mewlingoMenu"); },
-    startMewLingoLang: function (lang) { startMewLingo(lang); },
+    // Per-language hub: pick a quiz topic or open the cheat sheet.
+    goMewLingoLang: function (lang) { session.mewlingoLang = lang; go("mewlingoLang"); },
+    // arg is "<lang>:<topic>", e.g. "es:months"
+    startMewLingoTopic: function (arg) {
+      var p = arg.split(":");
+      startMewLingo(p[0], p[1]);
+    },
+    // Optional study screen: every word for a topic, tap a row to hear it. arg is "<lang>"
+    // (opens on Months) or "<lang>:<topic>".
+    goMewLingoCheat: function (arg) {
+      var p = arg.split(":");
+      session.mewlingoCheat = { lang: p[0], topic: p[1] || "months" };
+      go("mewlingoCheat");
+    },
+    mewlingoCheatTopic: function (topicKey) {
+      session.mewlingoCheat.topic = topicKey;
+      render();
+    },
+    // arg is the 1-based item number
+    mewlingoCheatSpeak: function (num) {
+      var c = session.mewlingoCheat;
+      if (c) speakMewLingoWord(c.lang, c.topic, parseInt(num, 10));
+    },
     mewlingoPick: function (num) { mewlingoPick(num); },
     mewlingoSpeak: function () { mewlingoSpeak(); },
     mewlingoNext: function () { mewlingoNext(); },
@@ -1390,7 +1487,13 @@
       saveState();
       render();
     },
-    celebrationContinue: function () { go(session.celebrationReturnTo || "home"); },
+    celebrationContinue: function () {
+      // One-shot: a chore payout sets this to "chores", and it must not leak into the next
+      // game's celebration (which should return home).
+      var dest = session.celebrationReturnTo || "home";
+      session.celebrationReturnTo = null;
+      go(dest);
+    },
 
     // ---- Mega Unlocks: chores & achievements ----
     choresSetupSubmit: function () {
@@ -1623,21 +1726,47 @@
     return a;
   }
 
-  function newMewLingoRound(lang) {
-    var correctNum = randInt(1, 10);
+  // Items are numbered 1..N within a topic (same convention as the original 1-10 quiz).
+  // `forcedNum` pins the correct item (months/days walk through each item once).
+  function newMewLingoRound(topicKey, forcedNum) {
+    var total = mewlingoTopic(topicKey).english.length;
+    var correctNum = forcedNum || randInt(1, total);
     var pool = [];
-    for (var n = 1; n <= 10; n++) if (n !== correctNum) pool.push(n);
+    for (var n = 1; n <= total; n++) if (n !== correctNum) pool.push(n);
     var distractors = shuffleArr(pool).slice(0, 2);
     var choiceNums = shuffleArr([correctNum].concat(distractors));
     return { current: correctNum, choices: choiceNums, answered: false, chosenNum: null };
   }
 
-  function startMewLingo(lang) {
+  function startMewLingo(lang, topicKey) {
+    topicKey = topicKey || "numbers";
+    var order = null;
+    var length = MEWLINGO_LENGTH;
+    if (topicKey !== "numbers") {
+      // Months and days: each item at most once per quiz, shuffled. Days is all 7;
+      // months is 8 of the 12 (a different mix each time).
+      var all = [];
+      for (var i = 1; i <= mewlingoTopic(topicKey).english.length; i++) all.push(i);
+      order = shuffleArr(all).slice(0, MEWLINGO_LENGTH);
+      length = order.length;
+    }
     session.mewlingo = {
-      lang: lang, index: 0, length: MEWLINGO_LENGTH, mistakes: 0,
-      round: newMewLingoRound(lang)
+      lang: lang, topic: topicKey, index: 0, length: length, mistakes: 0, order: order,
+      round: newMewLingoRound(topicKey, order ? order[0] : null)
     };
     go("mewlingo");
+  }
+
+  // Speaks item `num` (1-based) of a topic in a language, using hiragana for Japanese.
+  function speakMewLingoWord(lang, topicKey, num) {
+    if (typeof window.speechSynthesis === "undefined") return;
+    var entry = mewlingoTopic(topicKey).words[lang][num - 1];
+    try {
+      var utter = new SpeechSynthesisUtterance(entry.spoken || entry.word);
+      utter.lang = mewlingoLangDef(lang).speechLang;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch (e) {}
   }
 
   function mewlingoPick(numStr) {
@@ -1658,15 +1787,8 @@
 
   function mewlingoSpeak() {
     var g = session.mewlingo;
-    if (!g || typeof window.speechSynthesis === "undefined") return;
-    var entry = NUMBER_WORDS[g.lang][g.round.current - 1];
-    var lang = LANGUAGE_DEFS.filter(function (d) { return d.key === g.lang; })[0];
-    try {
-      var utter = new SpeechSynthesisUtterance(entry.spoken || entry.word);
-      utter.lang = lang.speechLang;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utter);
-    } catch (e) {}
+    if (!g) return;
+    speakMewLingoWord(g.lang, g.topic, g.round.current);
   }
 
   function mewlingoNext() {
@@ -1685,7 +1807,7 @@
       }
       return;
     }
-    g.round = newMewLingoRound(g.lang);
+    g.round = newMewLingoRound(g.topic, g.order ? g.order[g.index] : null);
     render();
   }
 
@@ -1852,7 +1974,7 @@
       chevronIcon() + "</a>" +
       '<a href="#" class="card-btn" style="background:var(--shy-purple-dark);box-shadow:0 6px 0 #5A4478;" data-action="goMewLingoMenu">' +
       '<div class="card-icon"><span class="fredoka" style="font-size:20px;">🌍</span></div>' +
-      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Mew-lingo</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Count to 10 around the world</div></div>' +
+      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Mew-lingo</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Numbers, months &amp; weekdays</div></div>' +
       chevronIcon() + "</a>" +
       '<a href="#" class="card-btn" style="background:var(--sad-blue-dark);box-shadow:0 6px 0 #2E5674;" data-action="goNotesMenu">' +
       '<div class="card-icon"><span class="fredoka" style="font-size:20px;">🎵</span></div>' +
@@ -2064,9 +2186,9 @@
   // ================= render: mew-lingo =================
   function renderMewLingoMenu() {
     var cards = LANGUAGE_DEFS.map(function (d) {
-      return '<a href="#" class="card-btn" style="background:var(--teal);box-shadow:0 6px 0 var(--teal-dark);" data-action="startMewLingoLang" data-arg="' + d.key + '">' +
+      return '<a href="#" class="card-btn" style="background:var(--teal);box-shadow:0 6px 0 var(--teal-dark);" data-action="goMewLingoLang" data-arg="' + d.key + '">' +
         '<div class="card-icon"><span class="fredoka" style="font-size:24px;">' + d.flag + '</span></div>' +
-        '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">' + d.label + '</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Count to 10 in ' + d.label + '</div></div>' +
+        '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">' + d.label + '</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Numbers, months &amp; days</div></div>' +
         chevronIcon() + "</a>";
     }).join("");
     return '<div class="screen">' +
@@ -2078,10 +2200,62 @@
       "</div>";
   }
 
+  // Per-language hub: the three quizzes plus the optional cheat sheet.
+  function renderMewLingoLang() {
+    var lang = mewlingoLangDef(session.mewlingoLang);
+    var cards = MEWLINGO_TOPICS.map(function (t) {
+      return '<a href="#" class="card-btn" style="background:var(--teal);box-shadow:0 6px 0 var(--teal-dark);" data-action="startMewLingoTopic" data-arg="' + lang.key + ":" + t.key + '">' +
+        '<div class="card-icon"><span class="fredoka" style="font-size:24px;">' + t.icon + '</span></div>' +
+        '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">' + t.label + '</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">' + t.blurb + '</div></div>' +
+        chevronIcon() + "</a>";
+    }).join("");
+    var cheat = '<a href="#" class="card-btn" style="background:var(--orange);box-shadow:0 6px 0 var(--orange-dark);" data-action="goMewLingoCheat" data-arg="' + lang.key + '">' +
+      '<div class="card-icon"><span class="fredoka" style="font-size:24px;">📖</span></div>' +
+      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Cheat Sheet</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Study the words first</div></div>' +
+      chevronIcon() + "</a>";
+    return '<div class="screen">' +
+      '<div class="row gap8"><a href="#" data-action="goMewLingoMenu">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Mew-lingo</div><div style="width:20px;"></div></div>' +
+      '<div class="col center gap8" style="margin-top:2px;"><div class="mascot-wrap" style="width:76px;height:76px;">' + mascotSvg("neutral", 76, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
+      '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">' + lang.flag + " " + lang.label + "</div></div>" +
+      '<div class="col gap14" style="margin-top:2px;">' + cards + cheat + "</div>" +
+      '<div class="grow"></div>' +
+      "</div>";
+  }
+
+  // Optional study screen. Tap a row to hear the word; "Start quiz" jumps to the quiz for
+  // the tab you're looking at.
+  function renderMewLingoCheat() {
+    var c = session.mewlingoCheat;
+    var lang = mewlingoLangDef(c.lang);
+    var topic = mewlingoTopic(c.topic);
+    var tabs = MEWLINGO_TOPICS.map(function (t) {
+      return '<button class="cheat-tab fredoka' + (t.key === c.topic ? " active" : "") + '" data-action="mewlingoCheatTopic" data-arg="' + t.key + '">' + t.icon + " " + t.tab + "</button>";
+    }).join("");
+    var rows = topic.words[c.lang].map(function (w, i) {
+      return '<button class="cheat-row" data-action="mewlingoCheatSpeak" data-arg="' + (i + 1) + '">' +
+        '<span class="cheat-en">' + topic.english[i] + "</span>" +
+        '<span class="cheat-fx"><span class="fredoka w">' + w.word + "</span>" + (w.spoken ? '<span class="k">' + w.spoken + "</span>" : "") + "</span>" +
+        '<span class="cheat-say">🔊</span></button>';
+    }).join("");
+    return '<div class="screen" style="gap:12px;">' +
+      '<div class="row between"><a href="#" data-action="goMewLingoLang" data-arg="' + lang.key + '">' + backIcon() + '</a>' +
+      '<div class="fredoka" style="font-size:18px;font-weight:700;">' + lang.flag + " " + lang.label + " cheat sheet</div><div style=\"width:20px;\"></div></div>" +
+      '<div class="row gap6">' + tabs + "</div>" +
+      '<div style="font-size:12px;color:var(--ink-soft);text-align:center;">Tap any word to hear it.</div>' +
+      '<div class="col" style="gap:6px;">' + rows + "</div>" +
+      '<div style="position:sticky;bottom:0;background:var(--cream);padding-top:6px;">' +
+      '<button class="primary-btn fredoka" data-action="startMewLingoTopic" data-arg="' + lang.key + ":" + topic.key + '">Start ' + topic.tab + " quiz</button></div>" +
+      "</div>";
+  }
+
   function renderMewLingo() {
     var g = session.mewlingo;
-    var entries = NUMBER_WORDS[g.lang];
-    var lang = LANGUAGE_DEFS.filter(function (d) { return d.key === g.lang; })[0];
+    var topic = mewlingoTopic(g.topic);
+    var entries = topic.words[g.lang];
+    var lang = mewlingoLangDef(g.lang);
+    var isNumbers = g.topic === "numbers";
+    var cur = entries[g.round.current - 1];
+    var curEnglish = topic.english[g.round.current - 1];
     var choices = g.round.choices.map(function (num) {
       var cls = "choice-btn fredoka";
       var faded = false;
@@ -2091,22 +2265,33 @@
         else faded = true;
       }
       var style = faded ? ' style="opacity:0.5;"' : "";
-      return '<button class="' + cls + '"' + style + ' data-action="mewlingoPick" data-arg="' + num + '">' + entries[num - 1].word + "</button>";
+      // Numbers: the digit is the prompt and the choices are foreign words.
+      // Months/days: the foreign word is the prompt and the choices are English.
+      var label = isNumbers ? entries[num - 1].word : topic.english[num - 1];
+      return '<button class="' + cls + '"' + style + ' data-action="mewlingoPick" data-arg="' + num + '">' + label + "</button>";
     }).join("");
     var speakBtn = '<a href="#" class="row center gap6" style="font-size:14px;font-weight:700;color:var(--teal-dark);" data-action="mewlingoSpeak">🔊<span>Listen</span></a>';
+    var prompt = isNumbers ?
+      '<div class="fredoka" style="font-size:52px;font-weight:700;color:var(--orange-dark);">' + g.round.current + "</div>" :
+      '<div style="font-size:14px;color:var(--ink-soft);">What does this mean in English?</div>' +
+      '<div class="fredoka" style="font-size:40px;font-weight:700;color:var(--orange-dark);word-break:break-word;line-height:1.1;">' + cur.word + "</div>" +
+      (cur.spoken ? '<div style="font-size:18px;color:var(--ink-soft);">' + cur.spoken + "</div>" : "");
+    // The English answer is shown whether you got it right or wrong.
     var feedback = "";
     if (g.round.answered) {
       var correct = g.round.chosenNum === g.round.current;
       feedback = '<div class="tip-bubble big" style="background:' + (correct ? "#DFF3EF" : "var(--mad-red)") + ';"><span class="txt" style="color:' + (correct ? "var(--teal-dark)" : "var(--orange-deep)") + ';">' +
-        (correct ? "Correct! " + entries[g.round.current - 1].word + " means " + g.round.current + "." : "Not quite - " + entries[g.round.current - 1].word + " means " + g.round.current + ".") +
+        (correct ? "Correct! " : "Not quite - ") +
+        // German shares a few months with English (April, August...) - "April means April" reads oddly.
+        (cur.word.toLowerCase() === curEnglish.toLowerCase() ? cur.word + " is " + curEnglish + " in English too!" : cur.word + " means " + curEnglish + ".") +
         "</span></div>" +
         '<button class="primary-btn fredoka" data-action="mewlingoNext">Next</button>';
     }
     return '<div class="screen">' +
-      '<div class="row between"><a href="#" data-action="goHome">' + backIcon() + '</a>' +
-      '<div class="pill">' + lang.flag + "<span>" + (g.index + 1) + " / " + g.length + "</span></div></div>" +
+      '<div class="row between"><a href="#" data-action="goMewLingoLang" data-arg="' + g.lang + '">' + backIcon() + '</a>' +
+      '<div class="pill">' + lang.flag + " " + topic.icon + "<span>" + (g.index + 1) + " / " + g.length + "</span></div></div>" +
       '<div class="col center gap10" style="margin-top:8px;">' +
-      '<div class="fredoka" style="font-size:52px;font-weight:700;color:var(--orange-dark);">' + g.round.current + "</div>" +
+      prompt +
       speakBtn +
       "</div>" +
       '<div class="col gap10" style="margin-top:8px;">' + choices + "</div>" +
