@@ -115,6 +115,30 @@
   }
   .choice-btn.primary { background: var(--orange); color: #fff; }
   .choice-btn.wrong { background: var(--wrong); color: #fff; }
+  /* What Would You Do? + Cat Calm-Down */
+  .scn-btn {
+    border-radius: 18px; padding: 14px 16px; text-align: left; background: var(--card-cream);
+    font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--ink); width: 100%;
+  }
+  .scn-btn.primary { background: var(--orange); color: #fff; }
+  .scn-btn.silly { background: #EAE0F2; color: var(--ink); opacity: 0.7; }
+  .scn-card { background: #fff; border-radius: 18px; padding: 14px 16px; box-shadow: 0 2px 0 rgba(0,0,0,0.06); text-align: center; }
+  .calm-link {
+    border-radius: 999px; padding: 9px 18px; background: #fff; color: var(--teal-dark);
+    font-size: 14px; font-weight: 700; box-shadow: 0 2px 0 rgba(0,0,0,0.08);
+  }
+  .breathe-stage { position: relative; width: 210px; height: 210px; display: flex; align-items: center; justify-content: center; }
+  .breathe-circle {
+    width: 110px; height: 110px; border-radius: 50%; background: var(--teal); opacity: 0.85;
+    transform: scale(0.7);
+  }
+  .breathe-circle.go { animation: breathe 8s ease-in-out 3; }
+  @keyframes breathe { 0%, 100% { transform: scale(0.7); } 50% { transform: scale(1.8); } }
+  .breathe-label { position: absolute; font-weight: 700; font-size: 18px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); opacity: 0; }
+  .breathe-label.in { animation: bIn 8s linear 3; }
+  .breathe-label.out { animation: bOut 8s linear 3; }
+  @keyframes bIn { 0% { opacity: 1; } 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+  @keyframes bOut { 0%, 49% { opacity: 0; } 50% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
   /* Mew-lingo cheat sheet */
   .cheat-tab {
     flex: 1; border-radius: 999px; padding: 9px 6px; text-align: center; background: var(--card-cream);
@@ -698,7 +722,10 @@
       activeChoreTimer: null,
       achievementStreakCurrent: 0,
       achievementStreakBest: 0,
-      lastAchievementDate: null
+      lastAchievementDate: null,
+      scenarioTally: { serious: 0, silly: 0, hot: 0 },
+      scenarioLog: [],
+      calmPointsDate: null
     };
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
@@ -1053,6 +1080,8 @@
     else if (session.view === "mewlingo") html = renderMewLingo();
     else if (session.view === "notesMenu") html = renderNotesMenu();
     else if (session.view === "notes") html = renderNotes();
+    else if (session.view === "scenario") html = renderScenario();
+    else if (session.view === "calm") html = renderCalm();
     el.innerHTML = html;
     wireEvents(el);
   }
@@ -1160,6 +1189,12 @@
     mewlingoNext: function () { mewlingoNext(); },
     goNotesMenu: function () { go("notesMenu"); },
     startNotesLevel: function (level) { startNotes(level); },
+    goScenarios: function () { startScenarios(); },
+    scenarioPick: function (i) { scenarioPick(i); },
+    scenarioNext: function () { scenarioNext(); },
+    scenarioSpeak: function () { scenarioSpeak(); },
+    goCalm: function (returnTo) { startCalm(returnTo); },
+    calmFinish: function () { leaveCalm(); },
     notesPick: function (letter) { notesPick(letter); },
     notesNext: function () { notesNext(); },
     copycatKeepGoing: function () {
@@ -1811,6 +1846,180 @@
     render();
   }
 
+  // ================= scenarios: What Would You Do? =================
+  // Each scenario has two "serious" answers (each with a strategy name) plus two others:
+  // either two silly ones, or one silly and one "hot" (a tempting angry reaction).
+  // The FIRST pick is logged (serious / silly / hot) so a parent can see the pattern.
+  var SCENARIO_LENGTH = 8;
+  var SCENARIO_POINTS = 1;
+  var SCENARIO_FINISH_BONUS = 5;
+  var CALM_POINTS = 2;
+  var CALM_BREATHS = 3;
+  var CALM_SECONDS = 24;
+  var SCENARIOS = [
+    { id: "seat", title: "Lunch seat", icon: "🍽️", q: "A kid is sitting in your seat at lunch. What do you do?",
+      s: [["Say \"I was sitting there. Can I sit next to you?\"", "Using your words! Asking nicely works better than getting upset."],
+          ["Find another seat by a friend. There's room!", "Flexible thinking! Sometimes the easy fix is to just move."]],
+      f: ["Say the seat is lava and run away!", "Sit on their head like a cat in a box!"] },
+    { id: "late", title: "Late to class", icon: "⏰", q: "You walk into class late and everyone looks at you. What do you do?",
+      s: [["Quietly sit down and say \"Sorry I'm late.\"", "Calm and polite - a great way to reset your day."],
+          ["Take a breath and ask the teacher what you missed.", "Asking for help is smart. You'll catch up fast!"]],
+      f: ["Announce \"The star has arrived!\" and bow.", "Tiptoe in like a ninja cat."] },
+    { id: "push", title: "Pushed at recess", icon: "🛝", q: "A kid pushes you down at recess. Ouch! What do you do?",
+      s: [["Get up, say \"Stop! I don't like that,\" and walk away.", "Strong words and a calm body. That's brave!"],
+          ["Take 3 deep breaths, then tell the recess teacher.", "Calm down first, then get a grown-up. Tough and wise!"]],
+      f: ["Say \"I'm a pancake!\" and flip over."], h: "Push them back!" },
+    { id: "group", title: "New group", icon: "👥", q: "The teacher puts you in a group you didn't want. What do you do?",
+      s: [["Think \"I can try this\" and share one idea.", "Giving it a try - you might surprise yourself!"],
+          ["Ask the group, \"What job should I do?\"", "Teamwork! Asking what job to take helps everyone."]],
+      f: ["Say the class hamster is your new group.", "Hide under the table and meow your answers."] },
+    { id: "knowit", title: "Already know it", icon: "💡", q: "The teacher is teaching something you already know. What do you do?",
+      s: [["Listen anyway. You might learn something new!", "Staying curious! There's always a new piece to find."],
+          ["Wait until the teacher is done, then ask for a bigger challenge.", "Asking for a challenge is a great idea!"]],
+      f: ["Shout all the answers in an opera voice.", "Take a nap in your pretend sleeping bag."] },
+    { id: "read", title: "Reading aloud", icon: "📖", q: "It's your turn to read out loud and your tummy feels fluttery. What do you do?",
+      s: [["Take a slow breath and read one sentence at a time.", "One breath, one sentence. You can do it!"],
+          ["Tell the teacher \"I'm nervous. Can I practice first?\"", "Telling someone you're nervous is brave."]],
+      f: ["Say you lost your voice and can only meow.", "Read to the class like a chicken."] },
+    { id: "exclude", title: "Can't play", icon: "🚫", q: "Some kids at recess say \"You can't play with us.\" What do you do?",
+      s: [["Say \"That hurts my feelings,\" then ask another group.", "Saying how you feel, then moving on. Strong!"],
+          ["Find a different game, and tell a grown-up if it keeps happening.", "Getting help when it keeps happening is smart."]],
+      f: ["Make a rule that everybody has to meow.", "Start a parade of one."] },
+    { id: "lost", title: "Lost a game", icon: "🎲", q: "You lost the game and your face feels hot. What do you do?",
+      s: [["Breathe in for 4, out for 4. Then say \"Good game.\"", "Calm breath and \"Good game\" - a champion move!"],
+          ["Take a quick break and get a drink of water.", "Taking a break is a great way to cool down."]],
+      f: ["Melt on the floor like ice cream."], h: "Throw the game pieces." },
+    { id: "wrong", title: "Wrong answer", icon: "✏️", q: "You say the wrong answer and someone giggles. What do you do?",
+      s: [["Take a breath. Everyone makes mistakes. Try again!", "Mistakes help your brain grow!"],
+          ["Ask the teacher to explain it one more time.", "Asking to hear it again is smart."]],
+      f: ["Say your brain is on vacation.", "Crawl under your desk to look for the right answer."] },
+    { id: "marker", title: "Grabbed marker", icon: "🖍️", q: "A kid grabs the marker you were using. What do you do?",
+      s: [["Say \"I'm still using it. You can have it next.\"", "Clear and kind. That's a great way to say it."],
+          ["Ask nicely, and tell the teacher if they won't give it back.", "Ask kindly first, then get help if you need it."]],
+      f: ["Say the marker only works for cats.", "Draw with a banana instead."] },
+    { id: "listen", title: "Nobody listens", icon: "🗣️", q: "In your group, nobody listens to your idea. What do you do?",
+      s: [["Say \"Can I share my idea? Then I want to hear yours.\"", "Fair sharing: you listen, they listen."],
+          ["Suggest everyone takes a turn sharing one idea.", "Taking turns means everyone gets heard."]],
+      f: ["Sing your idea like an opera.", "Send it over on a paper airplane."] },
+    { id: "newkid", title: "New kid", icon: "👋", q: "A new kid is standing alone at recess. What do you do?",
+      s: [["Walk over and say \"Do you want to play with us?\"", "Kindness! That kid will feel so welcome."],
+          ["Tell them your name and ask theirs.", "Saying hello is the first step to a new friend."]],
+      f: ["Give them a pet rock and walk away.", "High-five them from 100 feet away."] },
+    { id: "cutline", title: "Line cutter", icon: "🚶", q: "A kid cuts in front of you in line. What do you do?",
+      s: [["Say \"The line starts back there, please.\"", "Using your words, calmly and clearly."],
+          ["Tell the teacher calmly and keep your spot.", "Getting help from a grown-up is a smart move."]],
+      f: ["Pretend the line is a snake and hiss at it.", "Count everybody in line like a robot."] },
+    { id: "dare", title: "A risky dare", icon: "🛑", q: "A friend dares you to do something that breaks a rule. What do you do?",
+      s: [["Say \"No thanks, I'll get in trouble,\" and walk away.", "Standing strong! A real friend will understand."],
+          ["Say \"Let's play something else instead!\"", "Suggesting a new idea is a great way to change the game."]],
+      f: ["Say your pet dragon says no.", "Turn into a statue and refuse to move."] },
+    { id: "redo", title: "Do it again", icon: "📝", q: "The teacher says your work needs to be redone. What do you do?",
+      s: [["Take a breath and ask \"What should I fix?\"", "Asking what to fix turns a problem into a plan."],
+          ["Look at it again and make it better one part at a time.", "One small step at a time. That's how experts do it!"]],
+      f: ["Tell the teacher the pencil did it.", "Redo it with your toes."] }
+  ];
+  var SCENARIO_HOT_FEEDBACK = "Big feelings are okay! But that might make things worse. Let's find a move that helps.";
+  var SCENARIO_SILLY_FEEDBACK = "Ha! Silly kitty! Now, what would you REALLY do?";
+
+  function newScenarioRound(sc) {
+    var opts = [];
+    sc.s.forEach(function (a, i) { opts.push({ text: a[0], type: "serious", fb: a[1] }); });
+    sc.f.forEach(function (t) { opts.push({ text: t, type: "silly" }); });
+    if (sc.h) opts.push({ text: sc.h, type: "hot" });
+    return { sc: sc, options: shuffleArr(opts), firstType: null, retry: null, chosen: null, done: false };
+  }
+
+  function startScenarios() {
+    var picked = shuffleArr(SCENARIOS).slice(0, SCENARIO_LENGTH);
+    session.scenario = { list: picked, index: 0, length: picked.length, round: newScenarioRound(picked[0]) };
+    go("scenario");
+  }
+
+  function logScenarioFirstPick(sc, type) {
+    if (!state.scenarioTally) state.scenarioTally = { serious: 0, silly: 0, hot: 0 };
+    if (!state.scenarioLog) state.scenarioLog = [];
+    state.scenarioTally[type] = (state.scenarioTally[type] || 0) + 1;
+    state.scenarioLog.push({ id: sc.id, t: type, d: todayStr() });
+    if (state.scenarioLog.length > 150) state.scenarioLog = state.scenarioLog.slice(-150);
+  }
+
+  function scenarioPick(idxStr) {
+    var g = session.scenario;
+    var r = g.round;
+    if (r.done) return;
+    var opt = r.options[parseInt(idxStr, 10)];
+    if (!opt) return;
+    if (r.firstType === null) {
+      r.firstType = opt.type;
+      logScenarioFirstPick(r.sc, opt.type);
+    }
+    if (opt.type === "serious") {
+      r.done = true;
+      r.chosen = opt;
+      state.points += SCENARIO_POINTS;
+    } else {
+      r.retry = opt.type; // "silly" or "hot": show the gentle message and offer the serious answers
+    }
+    saveState();
+    render();
+  }
+
+  function scenarioNext() {
+    var g = session.scenario;
+    g.index++;
+    if (g.index >= g.length) {
+      recordDailyPlay();
+      state.levelsCompleted = (state.levelsCompleted || 0) + 1;
+      state.points += SCENARIO_FINISH_BONUS;
+      saveState();
+      session.scenario = null;
+      go("celebration", { celebration: { bonus: SCENARIO_FINISH_BONUS, subtitle: "You thought through " + g.length + " school moments - nice work!" } });
+      return;
+    }
+    g.round = newScenarioRound(g.list[g.index]);
+    render();
+  }
+
+  function scenarioSpeak() {
+    var g = session.scenario;
+    if (!g || typeof window.speechSynthesis === "undefined") return;
+    try {
+      var utter = new SpeechSynthesisUtterance(g.round.sc.q);
+      utter.lang = "en-US";
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utter);
+    } catch (e) {}
+  }
+
+  // ================= cat calm-down (breathing) =================
+  function startCalm(returnTo) {
+    var token = Date.now() + Math.random();
+    session.calm = { returnTo: returnTo || "home", done: false, token: token };
+    go("calm");
+    setTimeout(function () {
+      if (session.view === "calm" && session.calm && session.calm.token === token) {
+        session.calm.done = true;
+        render();
+      }
+    }, CALM_SECONDS * 1000);
+  }
+
+  function leaveCalm() {
+    var c = session.calm;
+    var back = c ? c.returnTo : "home";
+    if (c && c.done && state.calmPointsDate !== todayStr()) {
+      state.calmPointsDate = todayStr();
+      state.points += CALM_POINTS;
+      saveState();
+    }
+    session.calm = null;
+    if (back === "checkin" && session.checkin) go("checkin");
+    else if (back === "math" && session.math) go("math");
+    else if (back === "mood") go("mood");
+    else if (back === "scenario" && session.scenario) go("scenario");
+    else go("home");
+  }
+
   // ================= note-reading logic =================
   var STAFF_ALL_NOTES = [
     { letter: "E", y: 120 }, { letter: "F", y: 110 }, { letter: "G", y: 100 }, { letter: "A", y: 90 },
@@ -1922,6 +2131,7 @@
     }).join("");
     var aside = picked && MOOD_ASIDES[picked] ?
       '<div class="col center" style="font-size:13px;color:var(--ink-soft);margin-bottom:4px;">' + MOOD_ASIDES[picked] + "</div>" : "";
+    var calmLink = '<div class="row center"><button class="calm-link fredoka" data-action="goCalm" data-arg="mood">🫧 Need to calm down? Breathe with me</button></div>';
     var cta = picked ?
       '<a href="#" class="primary-btn fredoka" data-action="goHome">Let\'s play!</a>' :
       '<div style="height:52px;"></div>';
@@ -1932,7 +2142,7 @@
       '<div style="font-size:14px;color:var(--ink-soft);">Tap the cat that matches you</div>' +
       "</div>" +
       '<div style="display:grid;grid-template-columns:repeat(3, minmax(0,1fr));gap:10px;">' + tiles + "</div>" +
-      '<div class="grow"></div>' + aside + cta +
+      '<div class="grow"></div>' + calmLink + aside + cta +
       "</div>";
   }
   function moodBg(key) {
@@ -1978,7 +2188,11 @@
       chevronIcon() + "</a>" +
       '<a href="#" class="card-btn" style="background:var(--sad-blue-dark);box-shadow:0 6px 0 #2E5674;" data-action="goNotesMenu">' +
       '<div class="card-icon"><span class="fredoka" style="font-size:20px;">🎵</span></div>' +
-      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Note Names</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Learn to read music notes</div></div>' +
+      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">Mew-sical Notes</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">Learn to read music notes</div></div>' +
+      chevronIcon() + "</a>" +
+      '<a href="#" class="card-btn" style="background:#5E9E6B;box-shadow:0 6px 0 #417A4E;" data-action="goScenarios">' +
+      '<div class="card-icon"><span class="fredoka" style="font-size:20px;">🤔</span></div>' +
+      '<div class="col grow" style="gap:2px;"><div class="fredoka" style="font-size:19px;font-weight:600;">What Would You Do?</div><div style="font-size:13px;color:rgba(255,255,255,0.9);">School moments &amp; big feelings</div></div>' +
       chevronIcon() + "</a>" +
       '<a href="#" class="card-btn" style="background:#D9A62E;box-shadow:0 6px 0 #B3841C;" data-action="goChores">' +
       '<div class="card-icon"><span class="fredoka" style="font-size:20px;">⭐</span></div>' +
@@ -2064,7 +2278,7 @@
       var innerTip = "";
       if (emo) {
         var d2 = EMOTION_DEFS[emo];
-        var breath = d2.breath ? '<div class="row center"><div style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;"><div style="width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.8);"></div></div></div>' : "";
+        var breath = d2.breath ? '<div class="row center"><button class="calm-link fredoka" data-action="goCalm" data-arg="math">🫧 Breathe with me</button></div>' : "";
         innerTip = '<div class="col center gap8" style="background:' + d2.bg + ';border-radius:16px;padding:14px;margin-top:6px;">' +
           '<div style="font-size:14px;font-weight:700;color:' + d2.color + ';text-align:center;">' + d2.tip + "</div>" + breath +
           '<button style="background:#fff;border-radius:999px;padding:9px 20px;" data-action="mathCheckinContinue"><span style="font-size:13px;font-weight:700;color:' + d2.color + ';">' + d2.button + "</span></button>" +
@@ -2300,6 +2514,79 @@
       "</div>";
   }
 
+  // ================= render: scenarios =================
+  function renderScenario() {
+    var g = session.scenario;
+    var r = g.round;
+    var sc = r.sc;
+    var visible = [];
+    r.options.forEach(function (o, i) {
+      // After a silly/hot pick, only the serious answers stay on screen.
+      if (r.retry && !r.done && o.type !== "serious") return;
+      visible.push({ o: o, i: i });
+    });
+    var buttons = visible.map(function (v) {
+      var cls = "scn-btn";
+      var style = "";
+      if (r.done) {
+        if (v.o === r.chosen) cls += " primary";
+        else style = ' style="opacity:0.45;"';
+      }
+      return '<button class="' + cls + '"' + style + ' data-action="scenarioPick" data-arg="' + v.i + '">' + escapeHtml(v.o.text) + "</button>";
+    }).join("");
+    var feedback = "";
+    var mood = "neutral";
+    if (r.done) {
+      mood = "correct";
+      feedback = '<div class="tip-bubble big" style="background:#DFF3EF;"><span class="txt" style="color:var(--teal-dark);">' + escapeHtml(r.chosen.fb) + "</span></div>" +
+        '<button class="primary-btn fredoka" data-action="scenarioNext">' + (g.index + 1 >= g.length ? "Finish" : "Next") + "</button>";
+    } else if (r.retry === "silly") {
+      feedback = '<div class="tip-bubble big" style="background:#EAE0F2;"><span class="txt" style="color:#6E5590;">😹 ' + SCENARIO_SILLY_FEEDBACK + "</span></div>";
+    } else if (r.retry === "hot") {
+      mood = "concerned";
+      feedback = '<div class="tip-bubble big" style="background:var(--mad-red);"><span class="txt" style="color:var(--orange-deep);">' + SCENARIO_HOT_FEEDBACK + "</span></div>" +
+        '<div class="row center"><button class="calm-link fredoka" data-action="goCalm" data-arg="scenario">🫧 Breathe with me first</button></div>';
+    }
+    var question = r.retry && !r.done ? "" : "";
+    return '<div class="screen">' +
+      '<div class="row between"><a href="#" data-action="goHome">' + backIcon() + '</a>' +
+      '<div class="pill"><span>' + sc.icon + " " + (g.index + 1) + " / " + g.length + "</span></div></div>" +
+      '<div class="row gap10" style="margin-top:4px;align-items:center;"><div class="mascot-wrap" style="width:64px;height:64px;flex-shrink:0;">' + mascotSvg(mood, 64, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
+      '<div class="scn-card grow"><div class="fredoka" style="font-size:17px;font-weight:600;line-height:1.3;">' + escapeHtml(sc.q) + "</div>" +
+      '<a href="#" class="row center gap6" style="margin-top:6px;font-size:13px;font-weight:700;color:var(--teal-dark);" data-action="scenarioSpeak">🔊<span>Listen</span></a></div></div>' +
+      question +
+      '<div class="col gap10" style="margin-top:6px;">' + buttons + "</div>" +
+      feedback +
+      '<div class="grow"></div>' +
+      "</div>";
+  }
+
+  // ================= render: cat calm-down =================
+  function renderCalm() {
+    var c = session.calm;
+    var stage;
+    var caption;
+    var actions;
+    if (c.done) {
+      stage = '<div class="breathe-stage"><div class="breathe-circle" style="transform:scale(1.2);"></div><div class="breathe-label fredoka" style="opacity:1;">Nice job!</div></div>';
+      caption = "That was " + CALM_BREATHS + " slow cat breaths. How do you feel now?";
+      actions = '<button class="primary-btn fredoka" data-action="calmFinish">I feel calmer</button>';
+    } else {
+      stage = '<div class="breathe-stage"><div class="breathe-circle go"></div>' +
+        '<div class="breathe-label in fredoka">Breathe in</div><div class="breathe-label out fredoka">Breathe out</div></div>';
+      caption = "Watch the circle. Grow it with your breath in, shrink it with your breath out.";
+      actions = '<a href="#" style="text-align:center;font-size:13px;font-weight:700;color:#A08A80;" data-action="calmFinish">I\'m ready, skip →</a>';
+    }
+    return '<div class="screen">' +
+      '<div class="col center gap8" style="margin-top:4px;">' +
+      '<div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg(c.done ? "correct" : "neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
+      '<div class="fredoka" style="font-size:22px;font-weight:700;text-align:center;">Cat Calm-Down</div>' +
+      '<div style="font-size:14px;color:var(--ink-soft);text-align:center;max-width:270px;">' + caption + "</div></div>" +
+      '<div class="col center" style="margin-top:6px;">' + stage + "</div>" +
+      '<div class="grow"></div>' + actions +
+      "</div>";
+  }
+
   // ================= render: note names =================
   function noteStaffSvg(y) {
     var lines = [120, 100, 80, 60, 40].map(function (ly) {
@@ -2314,7 +2601,7 @@
 
   function renderNotesMenu() {
     return '<div class="screen">' +
-      '<div class="row gap8"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Note Names</div><div style="width:20px;"></div></div>' +
+      '<div class="row gap8"><a href="#" data-action="goHome">' + backIcon() + '</a><div class="fredoka" style="font-size:16px;font-weight:600;">Mew-sical Notes</div><div style="width:20px;"></div></div>' +
       '<div class="col center gap8" style="margin-top:4px;"><div class="mascot-wrap" style="width:90px;height:90px;">' + mascotSvg("neutral", 90, state.selectedColor, state.selectedOutfit, state.selectedEyeColor, state.selectedWhisker, state.selectedMarking) + "</div>" +
       '<div class="fredoka" style="font-size:20px;font-weight:700;text-align:center;">Learn the treble clef</div></div>' +
       '<div class="col gap14" style="margin-top:6px;">' +
@@ -2406,7 +2693,7 @@
     var tipHtml = "";
     if (emo) {
       var d = EMOTION_DEFS[emo];
-      var breath = d.breath ? '<div class="row center"><div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.5);display:flex;align-items:center;justify-content:center;"><div style="width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.8);"></div></div></div>' : "";
+      var breath = d.breath ? '<div class="row center"><button class="calm-link fredoka" data-action="goCalm" data-arg="checkin">🫧 Breathe with me</button></div>' : "";
       tipHtml = '<div class="col center gap10" style="background:' + d.bg + ';border-radius:16px;padding:18px;margin-top:6px;">' +
         '<div style="font-size:15px;font-weight:700;color:' + d.color + ';text-align:center;">' + d.tip + "</div>" + breath +
         '<button style="background:#fff;border-radius:999px;padding:10px 22px;" data-action="checkinContinue"><span style="font-size:14px;font-weight:700;color:' + d.color + ';">' + d.button + "</span></button>" +
@@ -2422,6 +2709,33 @@
       '<div class="grow"></div>' +
       '<a href="#" style="text-align:center;font-size:13px;font-weight:700;color:#A08A80;" data-action="skipCheckin">I\'m okay, skip →</a>' +
       "</div>";
+  }
+
+  // Parent-facing summary of FIRST picks in "What Would You Do?" - a conversation starter, not a score.
+  function scenarioReportHtml() {
+    var t = state.scenarioTally || { serious: 0, silly: 0, hot: 0 };
+    var total = (t.serious || 0) + (t.silly || 0) + (t.hot || 0);
+    if (!total) return "";
+    var rows = [
+      ["Calm & kind", t.serious || 0, "#5E9E6B"],
+      ["Silly", t.silly || 0, "#8F6FB0"],
+      ["Hot-headed", t.hot || 0, "#C2604B"]
+    ];
+    var bars = rows.map(function (r) {
+      var pct = Math.round((r[1] / total) * 100);
+      return '<div class="row gap10"><span style="font-size:12px;color:var(--ink-soft);width:78px;flex-shrink:0;">' + r[0] + '</span>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + "%;background:" + r[2] + ';"></div></div>' +
+        '<span style="font-size:12px;font-weight:700;width:16px;text-align:right;">' + r[1] + "</span></div>";
+    }).join("");
+    // Scenarios where the first instinct was silly/hot - good things to talk about together.
+    var titles = {};
+    SCENARIOS.forEach(function (sc) { titles[sc.id] = sc.title; });
+    var seen = {}, talk = [];
+    (state.scenarioLog || []).slice().reverse().forEach(function (e) {
+      if (e.t !== "serious" && titles[e.id] && !seen[e.id] && talk.length < 4) { seen[e.id] = 1; talk.push(titles[e.id]); }
+    });
+    return '<div class="col gap10" style="margin-top:4px;"><div class="fredoka" style="font-size:16px;font-weight:600;">What Would You Do? (first picks)</div>' + bars +
+      (talk.length ? '<div style="font-size:12px;color:var(--ink-soft);">Fun to talk about together: ' + talk.join(", ") + ".</div>" : "") + "</div>";
   }
 
   // ================= render: report =================
@@ -2456,6 +2770,7 @@
         '<div class="stat-card" style="background:#FBEED2;padding:12px 6px;">' + flameIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + state.achievementStreakCurrent + ' days</span><span style="font-size:11px;color:var(--ink-soft);">Daily goal streak</span></div>' +
         '<div class="stat-card" style="background:#DFF3EF;padding:12px 6px;">' + starIcon() + '<span class="fredoka" style="font-size:19px;font-weight:700;">' + state.achievementStreakBest + ' days</span><span style="font-size:11px;color:var(--ink-soft);">Best daily-goal streak</span></div>' +
         "</div>" : "") +
+      scenarioReportHtml() +
       '<div class="col gap10" style="margin-top:4px;"><div class="fredoka" style="font-size:16px;font-weight:600;">How you\'ve been feeling</div>' + barsHtml + "</div>" +
       '<div class="grow"></div>' +
       '<div style="text-align:center;font-size:13px;color:var(--ink-soft);">5 minutes a day - you\'re building a great habit!</div>' +
